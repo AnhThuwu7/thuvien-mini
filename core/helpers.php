@@ -33,6 +33,12 @@ function url(string $path = ''): string
     return base_url() . '/' . ltrim($path, '/');
 }
 
+/** Đường dẫn tới tệp tĩnh trong thư mục public (css, js, img): asset('css/app.css') */
+function asset(string $path): string
+{
+    return base_url() . '/' . ltrim($path, '/');
+}
+
 // ---------------------------------------------------------------------
 // Request
 // ---------------------------------------------------------------------
@@ -85,7 +91,7 @@ function abort(int $code, string $message = ''): void
 
     $view = __DIR__ . '/../app/Views/errors/' . $code . '.php';
     if (is_file($view)) {
-        require $view; // trong view dùng được $code và $message
+        require $view;
     } else {
         header('Content-Type: text/html; charset=utf-8');
         echo '<h1>' . $code . '</h1><p>' . e($message) . '</p>';
@@ -110,6 +116,22 @@ function flash(string $type, ?string $message = null): ?string
     $value = $_SESSION['_flash'][$type] ?? null;
     unset($_SESSION['_flash'][$type]);
     return $value;
+}
+
+/** Lấy tất cả flash và xóa luôn (dùng trong layout/header) */
+function flash_all(): array
+{
+    $raw = $_SESSION['_flash'] ?? [];
+    unset($_SESSION['_flash']);
+
+    $result = [];
+    foreach ($raw as $type => $message) {
+        $result[] = [
+            'type'    => $type,
+            'message' => $message,
+        ];
+    }
+    return $result;
 }
 
 /** Lưu dữ liệu form vừa nhập để điền lại khi báo lỗi (không lưu mật khẩu, CSRF). Dùng trước khi redirect. */
@@ -137,24 +159,19 @@ function old(string $key, string $default = ''): string
 
 function csrf_token(): string
 {
-    if (empty($_SESSION['_csrf'])) {
-        $_SESSION['_csrf'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['_csrf'];
+    return Csrf::token();
 }
 
 /** Đặt trong MỌI form POST: <?= csrf_field() ?> */
 function csrf_field(): string
 {
-    return '<input type="hidden" name="_csrf" value="' . e(csrf_token()) . '">';
+    return '<input type="hidden" name="csrf_token" value="' . e(Csrf::token()) . '">';
 }
 
-/** Kiểm tra token gửi lên (trường _csrf của form, hoặc header X-CSRF-TOKEN khi dùng Fetch). */
+/** Kiểm tra token (dùng khi cần kiểm tra thủ công) */
 function csrf_verify(): bool
 {
-    $sent  = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
-    $known = $_SESSION['_csrf'] ?? '';
-    return is_string($sent) && is_string($known) && $known !== '' && hash_equals($known, $sent);
+    return Csrf::verify();
 }
 
 // ---------------------------------------------------------------------

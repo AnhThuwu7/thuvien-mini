@@ -26,3 +26,4 @@ class HomeController extends Controller
         }
     }
 }
+ 
