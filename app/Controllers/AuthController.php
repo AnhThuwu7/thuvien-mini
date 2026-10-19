@@ -2,11 +2,10 @@
 
 class AuthController extends Controller
 {
-    // Hash giả: nếu email không tồn tại vẫn gọi password_verify để thời gian phản hồi
-    // không tiết lộ email nào có trong hệ thống. KHÔNG phải mật khẩu thật.
+    // Hash giả: email không tồn tại vẫn gọi password_verify (chống đoán email)
     private const DUMMY_HASH = '$2y$12$aCqRGnzd4CvkDjV6fRHsBuikkFzdU0oPD59KVD7R6PA05x9.2ck.a';
 
-    // GET auth/login: hiện form | POST auth/login: xử lý đăng nhập
+    // GET auth/login | POST auth/login
     public function login()
     {
         if (Auth::check()) {
@@ -18,7 +17,11 @@ class AuthController extends Controller
             return;
         }
 
-        $this->view('auth/login', ['title' => 'Đăng nhập', 'errors' => [], 'email' => '']);
+        $this->view('auth/login', [
+            'title'  => 'Đăng nhập',
+            'errors' => [],
+            'email'  => '',
+        ]);
     }
 
     private function handleLogin(): void
@@ -42,7 +45,6 @@ class AuthController extends Controller
             $ok   = password_verify($password, $hash);
 
             if ($user !== null && $ok) {
-                // Chặn tài khoản bị khóa
                 if (!empty($user['bi_khoa'])) {
                     $lyDo = !empty($user['ly_do_khoa']) ? $user['ly_do_khoa'] : 'Không rõ lý do';
                     $errors['login'] = 'Tài khoản của bạn đã bị khóa. Lý do: ' . $lyDo . '. Vui lòng liên hệ thủ thư.';
@@ -52,7 +54,6 @@ class AuthController extends Controller
                     $this->redirect(Auth::pullIntended() ?? url());
                 }
             } else {
-                // Thông báo chung: không cho biết sai email hay sai mật khẩu
                 $errors['login'] = 'Email hoặc mật khẩu không đúng.';
             }
         }
@@ -60,11 +61,11 @@ class AuthController extends Controller
         $this->view('auth/login', [
             'title'  => 'Đăng nhập',
             'errors' => $errors,
-            'email'  => $email
+            'email'  => $email,
         ]);
     }
 
-    // Đăng xuất: chỉ nhận POST (có CSRF) để không bị ép đăng xuất bằng link
+    // Chỉ nhận POST + CSRF
     public function logout()
     {
         $this->requirePost();
@@ -73,17 +74,19 @@ class AuthController extends Controller
         $this->redirect(url('auth/login'));
     }
 
-    // Hồ sơ của tôi (trang mẫu cần đăng nhập)
     public function profile()
     {
         $this->requireLogin();
 
         $me = $this->model('User')->findById(Auth::id());
-        if ($me === null) { // tài khoản đã bị xóa khi đang đăng nhập
+        if ($me === null) {
             Auth::logout();
             $this->redirect(url('auth/login'));
         }
 
-        $this->view('auth/profile', ['title' => 'Hồ sơ của tôi', 'me' => $me]);
+        $this->view('auth/profile', [
+            'title' => 'Hồ sơ của tôi',
+            'me'    => $me,
+        ]);
     }
 }
