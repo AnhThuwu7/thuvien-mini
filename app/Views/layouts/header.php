@@ -33,22 +33,43 @@
                         <span class="icon">📖</span> Sách đang mượn
                     </a>
 
-                <?php elseif ($role === 'thu_thu'): ?>
+                 <?php elseif ($role === 'thu_thu'): ?>
                     <a href="<?= e(url('loans')) ?>" class="nav-link">
                         <span class="icon">🔄</span> Xử lý Mượn - Trả
+                    </a>
+                    <a href="<?= e(url('loans/history')) ?>" class="nav-link">
+                        <span class="icon">📜</span> Lịch sử mượn sách
                     </a>
                     <a href="<?= e(url('books')) ?>" class="nav-link">
                         <span class="icon">📚</span> Quản lý kho sách
                     </a>
+                    <a href="<?= e(url('loan-requests')) ?>" class="nav-link">
+                        <span class="icon">📋</span> Yêu cầu mượn sách
+                    </a>
 
-                <?php elseif ($role === 'quan_tri'): ?>
-                    <a href="<?= e(url('users')) ?>" class="nav-link">
-                        <span class="icon">👥</span> Quản lý tài khoản
-                    </a>
-                    <a href="<?= e(url('settings')) ?>" class="nav-link">
-                        <span class="icon">⚙️</span> Cấu hình hệ thống
-                    </a>
-                <?php endif; ?>
+                
+<?php elseif ($role === 'quan_tri'): ?>
+    <a href="<?= e(url('loans')) ?>" class="nav-link">
+        <span class="icon">🔄</span> Mượn - Trả
+    </a>
+
+    <a href="<?= e(url('loans/history')) ?>" class="nav-link">
+        <span class="icon">📜</span> Lịch sử mượn
+    </a>
+
+    <a href="<?= e(url('loan-requests')) ?>" class="nav-link">
+        <span class="icon">📋</span> Yêu cầu mượn
+    </a>
+
+    <a href="<?= e(url('users')) ?>" class="nav-link">
+        <span class="icon">👥</span> Tài khoản
+    </a>
+
+    <a href="<?= e(url('settings')) ?>" class="nav-link">
+        <span class="icon">⚙️</span> Cấu hình
+    </a>
+<?php endif; ?>
+
             </nav>
 
             <!-- GÓC PHẢI: AVATAR & NÚT BA GẠCH (☰) -->
@@ -95,15 +116,34 @@
             <span class="icon">👤</span> Hồ sơ cá nhân
         </a>
 
+        <?php if (in_array(Auth::user()['vai_tro'] ?? '', ['thu_thu', 'quan_tri'], true)): ?>
+            <div class="drawer-divider">Nghiệp vụ thư viện</div>
+
+            <a href="<?= e(url('loans')) ?>" class="drawer-item">
+                <span class="icon">🔄</span> Xử lý Mượn - Trả
+            </a>
+
+            <a href="<?= e(url('loans/history')) ?>" class="drawer-item">
+                <span class="icon">📜</span> Lịch sử mượn sách
+            </a>
+
+            <a href="<?= e(url('loan-requests')) ?>" class="drawer-item">
+                <span class="icon">📋</span> Yêu cầu mượn sách
+            </a>
+        <?php endif; ?>
+
         <?php if (Auth::user()['vai_tro'] === 'quan_tri'): ?>
             <div class="drawer-divider">Quản trị viên</div>
+
             <a href="<?= e(url('users')) ?>" class="drawer-item">
                 <span class="icon">👥</span> Quản lý tài khoản
             </a>
+
             <a href="<?= e(url('settings')) ?>" class="drawer-item">
                 <span class="icon">⚙️</span> Cấu hình hệ thống
             </a>
         <?php endif; ?>
+
 
         <div class="drawer-divider"></div>
 
