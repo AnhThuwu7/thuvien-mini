@@ -1280,6 +1280,17 @@ $queryUrl = static function (int $page) use (
                             $isOverdue = $status === 'qua_han';
                             $loanId = (int) ($loan['phieu_muon_id'] ?? 0);
                             $fine = (float) ($loan['tien_phat'] ?? 0);
+                            // Gợi ý phạt quá hạn (chưa trả)
+                            $suggestedFine = $fine;
+                            if (empty($loan['tra_luc']) && !empty($loan['han_tra'])) {
+                                $han = new DateTimeImmutable(substr((string) $loan['han_tra'], 0, 10));
+                                $today = new DateTimeImmutable('today');
+                                $daysOver = (int) $han->diff($today)->format('%r%a');
+                                if ($daysOver > 0) {
+                                    $rate = (float) ($finePerDay ?? 2000);
+                                    $suggestedFine = round($daysOver * $rate, 2);
+                                }
+                            }
                             ?>
 
                             <tr>
@@ -1355,7 +1366,8 @@ $queryUrl = static function (int $page) use (
                                             data-loan-id="<?= $loanId ?>"
                                             data-book="<?= e($loan['ten_sach'] ?? 'Chưa có tên sách') ?>"
                                             data-reader="<?= e($loan['ten_doc_gia'] ?? '') ?>"
-                                            data-fine="<?= (int) $fine ?>"
+                                            data-fine="<?= e((string) (int) $suggestedFine) ?>"
+                                            data-days-overdue="<?= (int) (empty($loan['tra_luc']) && !empty($loan['han_tra']) ? max(0, (int) (new DateTimeImmutable(substr((string)$loan['han_tra'],0,10)))->diff(new DateTimeImmutable('today'))->format('%r%a')) : 0) ?>"
                                         >
                                             ↩ Trả sách
                                         </button>
@@ -1526,6 +1538,9 @@ $queryUrl = static function (int $page) use (
 
             <div class="loan-field">
                 <label for="modalFine">Tiền phạt (VNĐ)</label>
+                <small id="modalFineHint" style="display:block;color:#7a6a5a;margin:4px 0 8px;">
+                    Tự tính: số ngày quá hạn × mức phạt/ngày (Cấu hình hệ thống).
+                </small>
                 <input
                     id="modalFine"
                     type="number"
@@ -1598,6 +1613,15 @@ $queryUrl = static function (int $page) use (
         reader.textContent = readerName;
         book.textContent = bookName;
         fine.value = fineValue;
+        const days = button.dataset.daysOverdue || '0';
+        const hint = document.getElementById('modalFineHint');
+        if (hint) {
+            if (parseInt(days, 10) > 0) {
+                hint.textContent = 'Quá hạn ' + days + ' ngày → hệ thống gợi ý ' + Number(fineValue).toLocaleString('vi-VN') + ' đ (có thể tăng thêm, không giảm dưới mức này).';
+            } else {
+                hint.textContent = 'Chưa quá hạn → phạt mặc định 0 đ (có thể nhập thêm nếu hư hỏng).';
+            }
+        }
         condition.value = 'tot';
         note.value = '';
 

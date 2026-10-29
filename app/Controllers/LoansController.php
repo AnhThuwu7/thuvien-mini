@@ -1,4 +1,3 @@
-
 <?php
 
 class LoansController extends Controller
@@ -63,17 +62,16 @@ class LoansController extends Controller
             'stats' => $loanModel->getLoanStats(),
             'keyword' => $keyword,
             'selectedStatus' => $status,
+            'finePerDay' => (float) $this->model('Setting')->getValue('tien_phat_moi_ngay', 2000),
         ]);
     }
-    
+
     public function history(): void
     {
-        // Chỉ thủ thư và quản trị viên được xem
         $this->requireRole('thu_thu', 'quan_tri');
 
         $loanModel = $this->model('Loan');
 
-        // Lấy từ khóa và trạng thái lọc
         $keyword = trim((string) ($_GET['q'] ?? ''));
         $status = trim((string) ($_GET['status'] ?? ''));
 
@@ -85,7 +83,6 @@ class LoansController extends Controller
             $status = '';
         }
 
-        // Phân trang
         $perPage = 10;
 
         $totalLoans = $loanModel->countFilteredLoans(
@@ -119,7 +116,6 @@ class LoansController extends Controller
             $status
         );
 
-        // Hiển thị trang lịch sử mượn của toàn bộ độc giả
         $this->view('loans/history', [
             'title' => 'Lịch sử mượn sách',
             'loans' => $loans,
@@ -132,7 +128,6 @@ class LoansController extends Controller
             'selectedStatus' => $status,
         ]);
     }
-
 
     public function mine(): void
     {
@@ -179,14 +174,9 @@ class LoansController extends Controller
             FILTER_VALIDATE_INT
         );
 
-        $dueDate = trim(
-            (string) ($_POST['han_tra'] ?? '')
-        );
-
-        if (!$userId || !$copyId || $dueDate === '') {
-            $_SESSION['error'] =
-                'Vui lòng điền đầy đủ thông tin lập phiếu mượn.';
-
+        // Hạn trả do server tính trong Loan::createLoan (so_ngay_muon)
+        if (!$userId || !$copyId) {
+            flash('error', 'Vui lòng chọn độc giả và bản sao sách.');
             $this->redirect(url('loans/create'));
             return;
         }
@@ -195,25 +185,20 @@ class LoansController extends Controller
             $this->model('Loan')->createLoan(
                 (int) $userId,
                 (int) $copyId,
-                $dueDate,
                 (int) Auth::id()
             );
 
-            $_SESSION['success'] = 'Lập phiếu mượn thành công!';
-
+            flash('success', 'Lập phiếu mượn thành công!');
             $this->redirect(url('loans'));
         } catch (RuntimeException $e) {
-            $_SESSION['error'] = $e->getMessage();
-
+            flash('error', $e->getMessage());
             $this->redirect(url('loans/create'));
         } catch (Throwable $e) {
             error_log(
                 '[LoansController::store] ' . $e->getMessage()
             );
 
-            $_SESSION['error'] =
-                'Không thể lập phiếu mượn do lỗi hệ thống.';
-
+            flash('error', 'Không thể lập phiếu mượn do lỗi hệ thống.');
             $this->redirect(url('loans/create'));
         }
     }
@@ -229,11 +214,17 @@ class LoansController extends Controller
             FILTER_VALIDATE_INT
         );
 
+        $page = filter_input(
+            INPUT_GET,
+            'page',
+            FILTER_VALIDATE_INT
+        );
+        $page = ($page && $page > 0) ? $page : 1;
+        $back = url('loans') . '?page=' . $page;
+
         if (!$loanId || $loanId <= 0) {
-            $this->jsonError(
-                'Mã phiếu mượn không hợp lệ.',
-                400
-            );
+            flash('error', 'Mã phiếu mượn không hợp lệ.');
+            $this->redirect($back);
             return;
         }
 
@@ -242,7 +233,7 @@ class LoansController extends Controller
         );
 
         $fineInput = trim(
-            (string) ($_POST['tien_phat'] ?? '0')
+            (string) ($_POST['tien_phat'] ?? '')
         );
 
         $note = trim(
@@ -254,54 +245,60 @@ class LoansController extends Controller
             ['tot', 'hong', 'mat'],
             true
         )) {
-            $this->jsonError(
-                'Tình trạng sách không hợp lệ.',
-                400
-            );
+            flash('error', 'Tình trạng sách không hợp lệ.');
+            $this->redirect($back);
             return;
         }
 
-        if (
-            $fineInput === ''
-            || !is_numeric($fineInput)
-            || !is_finite((float) $fineInput)
-            || (float) $fineInput < 0
-        ) {
-            $this->jsonError(
-                'Tiền phạt không hợp lệ.',
-                400
-            );
+        $loanModel = $this->model('Loan');
+        try {
+            $calc = $loanModel->calculateOverdueFine((int) $loanId);
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            $this->redirect($back);
             return;
+        }
+
+        $autoFine = (float) $calc['fine'];
+
+        if ($fineInput !== '' && is_numeric($fineInput) && is_finite((float) $fineInput)) {
+            $manual = (float) $fineInput;
+            if ($manual < 0) {
+                flash('error', 'Tiền phạt không hợp lệ.');
+                $this->redirect($back);
+                return;
+            }
+            $fine = max($autoFine, $manual);
+        } else {
+            $fine = $autoFine;
         }
 
         if (mb_strlen($note) > 255) {
-            $this->jsonError(
-                'Ghi chú không được vượt quá 255 ký tự.',
-                400
-            );
+            flash('error', 'Ghi chú không được vượt quá 255 ký tự.');
+            $this->redirect($back);
             return;
         }
 
         $staffId = (int) Auth::id();
 
         if ($staffId <= 0) {
-            $this->jsonError(
-                'Vui lòng đăng nhập lại.',
-                401
-            );
+            flash('error', 'Vui lòng đăng nhập lại.');
+            $this->redirect(url('auth/login'));
             return;
         }
 
         try {
-            $this->model('Loan')->returnBook(
+            $loanModel->returnBook(
                 (int) $loanId,
                 $staffId,
                 $condition,
-                (float) $fineInput,
+                (float) $fine,
                 $note
             );
+            flash('success', 'Đã xác nhận trả sách.');
         } catch (RuntimeException $e) {
-            $this->jsonError($e->getMessage(), 400);
+            flash('error', $e->getMessage());
+            $this->redirect($back);
             return;
         } catch (Throwable $e) {
             error_log(
@@ -309,24 +306,11 @@ class LoansController extends Controller
                 . $e->getMessage()
             );
 
-            $this->jsonError(
-                'Không thể xác nhận trả sách. '
-                . 'Vui lòng kiểm tra nhật ký lỗi.',
-                500
-            );
+            flash('error', 'Không thể xác nhận trả sách. Vui lòng thử lại.');
+            $this->redirect($back);
             return;
         }
 
-        $page = filter_input(
-            INPUT_GET,
-            'page',
-            FILTER_VALIDATE_INT
-        );
-
-        $page = ($page && $page > 0) ? $page : 1;
-
-        $this->redirect(
-            url('loans') . '?page=' . $page
-        );
+        $this->redirect($back);
     }
 }

@@ -1,5 +1,7 @@
-
 <?php
+/**
+ * @var array $loans
+ */
 $totalLoans = count($loans);
 $returnedLoans = 0;
 $borrowingLoans = 0;
@@ -7,9 +9,10 @@ $overdueLoans = 0;
 $totalFine = 0;
 
 foreach ($loans as $loan) {
-    if (($loan['da_tra'] ?? false) == true) {
+    $st = $loan['trang_thai_hien_thi'] ?? 'dang_muon';
+    if ($st === 'da_tra') {
         $returnedLoans++;
-    } elseif (($loan['qua_han'] ?? false) == true) {
+    } elseif ($st === 'qua_han') {
         $overdueLoans++;
     } else {
         $borrowingLoans++;
@@ -439,10 +442,11 @@ foreach ($loans as $loan) {
                     <tbody>
                         <?php foreach ($loans as $index => $loan): ?>
                             <?php
-                            if (($loan['da_tra'] ?? false) == true) {
+                            $st = $loan['trang_thai_hien_thi'] ?? 'dang_muon';
+                            if ($st === 'da_tra') {
                                 $statusClass = 'returned';
                                 $statusLabel = 'Đã trả';
-                            } elseif (($loan['qua_han'] ?? false) == true) {
+                            } elseif ($st === 'qua_han') {
                                 $statusClass = 'overdue';
                                 $statusLabel = 'Quá hạn';
                             } else {
@@ -498,10 +502,11 @@ foreach ($loans as $loan) {
             <div class="loan-mobile-list">
                 <?php foreach ($loans as $index => $loan): ?>
                     <?php
-                    if (($loan['da_tra'] ?? false) == true) {
+                    $st = $loan['trang_thai_hien_thi'] ?? 'dang_muon';
+                    if ($st === 'da_tra') {
                         $statusClass = 'returned';
                         $statusLabel = 'Đã trả';
-                    } elseif (($loan['qua_han'] ?? false) == true) {
+                    } elseif ($st === 'qua_han') {
                         $statusClass = 'overdue';
                         $statusLabel = 'Quá hạn';
                     } else {

@@ -1,4 +1,3 @@
-
 <?php
 
 class Loan extends Model
@@ -8,7 +7,10 @@ class Loan extends Model
         return $this->fetchAll(
             "SELECT id, ho_ten, email
              FROM nguoi_dung
-             WHERE vai_tro = 'doc_gia'"
+             WHERE vai_tro = 'doc_gia'
+               AND bi_khoa = 0
+               AND xoa_luc IS NULL
+             ORDER BY ho_ten ASC"
         );
     }
 
@@ -19,36 +21,36 @@ class Loan extends Model
              FROM ban_sao AS bs
              INNER JOIN sach AS s ON bs.sach_id = s.id
              WHERE bs.trang_thai = 'con_trong'
-               AND bs.xoa_luc IS NULL"
+               AND bs.xoa_luc IS NULL
+               AND s.xoa_luc IS NULL"
         );
     }
 
+    /**
+     * Lập phiếu mượn.
+     * Hạn trả tính trên server từ cau_hinh.so_ngay_muon (không lấy từ form).
+     */
     public function createLoan(
         int $userId,
         int $copyId,
-        string $dueDate,
         int $staffId
     ): void {
-        if (strtotime($dueDate) <= time()) {
-            throw new RuntimeException(
-                'Hạn trả phải là một ngày trong tương lai.'
-            );
-        }
-
         $this->transaction(function () use (
-            $userId, $copyId, $dueDate, $staffId
+            $userId, $copyId, $staffId
         ): void {
             $user = $this->fetchOne(
                 "SELECT id, bi_khoa
                  FROM nguoi_dung
                  WHERE id = ?
+                   AND vai_tro = 'doc_gia'
+                   AND xoa_luc IS NULL
                  FOR UPDATE",
                 [$userId]
             );
 
             if (!$user) {
                 throw new RuntimeException(
-                    'Không tìm thấy thông tin độc giả.'
+                    'Không tìm thấy độc giả hợp lệ.'
                 );
             }
 
@@ -56,6 +58,14 @@ class Loan extends Model
                 throw new RuntimeException(
                     'Tài khoản độc giả đang bị khóa.'
                 );
+            }
+
+            $limitRow = $this->fetchOne(
+                "SELECT gia_tri FROM cau_hinh WHERE khoa = 'so_sach_toi_da' LIMIT 1"
+            );
+            $maxBooks = (int) ($limitRow['gia_tri'] ?? 5);
+            if ($maxBooks < 1) {
+                $maxBooks = 5;
             }
 
             $activeLoans = $this->fetchOne(
@@ -66,17 +76,19 @@ class Loan extends Model
                 [$userId]
             );
 
-            if ((int) ($activeLoans['total'] ?? 0) >= 3) {
+            if ((int) ($activeLoans['total'] ?? 0) >= $maxBooks) {
                 throw new RuntimeException(
-                    'Độc giả đã đạt giới hạn số sách được mượn.'
+                    'Độc giả đã đạt giới hạn số sách được mượn (' . $maxBooks . ' quyển).'
                 );
             }
 
             $copy = $this->fetchOne(
-                "SELECT id, trang_thai
-                 FROM ban_sao
-                 WHERE id = ?
-                   AND xoa_luc IS NULL
+                "SELECT bs.id, bs.trang_thai
+                 FROM ban_sao AS bs
+                 INNER JOIN sach AS s ON s.id = bs.sach_id
+                 WHERE bs.id = ?
+                   AND bs.xoa_luc IS NULL
+                   AND s.xoa_luc IS NULL
                  FOR UPDATE",
                 [$copyId]
             );
@@ -92,6 +104,17 @@ class Loan extends Model
                     'Bản sao sách hiện không có sẵn.'
                 );
             }
+
+            $row = $this->fetchOne(
+                "SELECT gia_tri FROM cau_hinh WHERE khoa = 'so_ngay_muon' LIMIT 1"
+            );
+            $days = (int) ($row['gia_tri'] ?? 14);
+            if ($days < 1) {
+                $days = 14;
+            }
+            $dueDate = (new DateTimeImmutable('today'))
+                ->modify('+' . $days . ' days')
+                ->format('Y-m-d');
 
             $this->execute(
                 "INSERT INTO phieu_muon
@@ -132,6 +155,8 @@ class Loan extends Model
             );
         });
     }
+
+    // ===== GIỮ NGUYÊN TỪ ĐÂY XUỐNG (getHistoryByReaderId, returnBook, ...) =====
 
     public function getHistoryByReaderId(int $readerId): array
     {
@@ -340,6 +365,65 @@ class Loan extends Model
     public function getAllLoans(): array
     {
         return $this->getLoansPaginated(100, 0);
+    }
+
+
+    /**
+     * Tính tiền phạt quá hạn theo cấu hình tien_phat_moi_ngay.
+     * Công thức: max(0, số ngày quá hạn) × đơn giá/ngày.
+     * Ngày trả dùng $returnDate (Y-m-d) hoặc hôm nay.
+     *
+     * @return array{days_overdue:int, fine_per_day:float, fine:float, han_tra:?string}
+     */
+    public function calculateOverdueFine(int $loanId, ?string $returnDate = null): array
+    {
+        $loan = $this->fetchOne(
+            "SELECT id, han_tra, tra_luc
+             FROM phieu_muon
+             WHERE id = ?
+             LIMIT 1",
+            [$loanId]
+        );
+
+        if ($loan === null) {
+            throw new RuntimeException('Không tìm thấy phiếu mượn.');
+        }
+
+        $settingRow = $this->fetchOne(
+            "SELECT gia_tri FROM cau_hinh WHERE khoa = 'tien_phat_moi_ngay' LIMIT 1"
+        );
+        $finePerDay = (float) ($settingRow['gia_tri'] ?? 2000);
+        if ($finePerDay < 0) {
+            $finePerDay = 0;
+        }
+
+        $hanTra = $loan['han_tra'] ?? null;
+        if ($hanTra === null || $hanTra === '') {
+            return [
+                'days_overdue' => 0,
+                'fine_per_day' => $finePerDay,
+                'fine' => 0.0,
+                'han_tra' => null,
+            ];
+        }
+
+        $han = new DateTimeImmutable(substr((string) $hanTra, 0, 10));
+        if ($returnDate !== null && $returnDate !== '') {
+            $ret = new DateTimeImmutable(substr($returnDate, 0, 10));
+        } else {
+            $ret = new DateTimeImmutable('today');
+        }
+
+        $days = (int) $han->diff($ret)->format('%r%a');
+        // %r%a: âm nếu ret < han (chưa quá hạn)
+        $daysOverdue = max(0, $days);
+
+        return [
+            'days_overdue' => $daysOverdue,
+            'fine_per_day' => $finePerDay,
+            'fine' => round($daysOverdue * $finePerDay, 2),
+            'han_tra' => $han->format('Y-m-d'),
+        ];
     }
 
     public function returnBook(

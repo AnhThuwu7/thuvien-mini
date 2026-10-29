@@ -1,8 +1,3 @@
-/* =========================================================
-   THƯ VIỆN MINI – STYLE OPEN LIBRARY
-   Responsive Navbar + Sticky Footer
-   ========================================================= */
-
 :root {
     --primary: #8B5E3C;
     --primary-dark: #6F4A2F;
@@ -41,7 +36,7 @@ body {
     width: 100%;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 0 1.25rem 3rem;
+    padding: 1.75rem 1.25rem 3rem; /* top: tách khỏi header */
 }
 
 .app-footer {
@@ -101,11 +96,17 @@ body {
 
 .nav-main-links {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    justify-content: space-evenly;
-    gap: 4px;
+    justify-content: flex-start;
+    gap: 0.35rem;
     min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
 }
 
 .nav-link {
@@ -143,6 +144,7 @@ body {
     flex: 0 0 auto;
     align-items: center;
     gap: 10px;
+    margin-left: auto;
 }
 
 .user-avatar-small {
@@ -591,5 +593,51 @@ body:not(:has(.app-footer)) .card.narrow {
 
     .card {
         padding: 1.25rem;
+    }
+}
+
+
+/* ========== Navbar + content spacing (TV1+TV2+TV3) ========== */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    flex-wrap: nowrap;
+}
+
+.nav-brand {
+    flex-direction: row !important;
+    white-space: nowrap;
+}
+
+.nav-brand span {
+    white-space: nowrap;
+}
+
+.nav-main-links {
+    justify-content: flex-start !important;
+    flex: 0 1 auto !important;
+    gap: 0.35rem !important;
+}
+
+.nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.page-content {
+    padding-top: 1.75rem !important;
+}
+
+.flash-wrap {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 1100px) {
+    .nav-main-links {
+        display: none !important;
     }
 }
