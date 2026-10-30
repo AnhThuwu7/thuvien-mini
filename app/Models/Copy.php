@@ -245,4 +245,44 @@ class Copy extends Model
             'is_first' => $seq === 1,
         ];
     }
+           /** Bản sao của một đầu sách (catalog độc giả) */
+    public function getByBookId(int $bookId): array
+    {
+        return $this->fetchAll(
+            "SELECT id, ma_ban_sao, trang_thai, vi_tri_ke
+             FROM ban_sao
+             WHERE sach_id = ?
+               AND xoa_luc IS NULL
+             ORDER BY ma_ban_sao ASC",
+            [$bookId]
+        );
+    }
+
+    /**
+     * Bản sao + phiếu đang mượn (thủ thư / admin).
+     */
+    public function getByBookIdWithLoan(int $bookId): array
+    {
+        return $this->fetchAll(
+            "SELECT
+                bs.id,
+                bs.ma_ban_sao,
+                bs.trang_thai,
+                bs.vi_tri_ke,
+                pm.id AS phieu_muon_id,
+                pm.han_tra,
+                nd.ho_ten AS ten_doc_gia,
+                nd.ma_doc_gia
+             FROM ban_sao AS bs
+             LEFT JOIN phieu_muon AS pm
+                    ON pm.ban_sao_id = bs.id
+                   AND pm.tra_luc IS NULL
+             LEFT JOIN nguoi_dung AS nd
+                    ON nd.id = pm.nguoi_dung_id
+             WHERE bs.sach_id = ?
+               AND bs.xoa_luc IS NULL
+             ORDER BY bs.ma_ban_sao ASC",
+            [$bookId]
+        );
+    }
 }

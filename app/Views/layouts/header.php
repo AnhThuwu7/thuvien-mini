@@ -29,6 +29,9 @@
                     <a href="<?= e(url('loans/mine')) ?>" class="nav-link">
                         <span class="icon">📖</span> Sách đang mượn
                     </a>
+                    <a href="<?= e(url('loan-requests/mine')) ?>" class="nav-link">
+                        <span class="icon">📋</span> Yêu cầu mượn
+                    </a>
 
                 <?php elseif ($role === 'thu_thu'): ?>
                     <a href="<?= e(url('loans')) ?>" class="nav-link">
@@ -125,6 +128,9 @@
             </a>
             <a href="<?= e(url('loans/mine')) ?>" class="drawer-item">
                 <span class="icon">📖</span> Sách đang mượn
+            </a>
+            <a href="<?= e(url('loan-requests/mine')) ?>" class="drawer-item">
+                <span class="icon">📋</span> Yêu cầu mượn của tôi
             </a>
         <?php endif; ?>
 

@@ -1,185 +1,169 @@
-
 <?php
 
 class LoanRequestsController extends Controller
 {
-    /**
-     * Hiển thị danh sách yêu cầu đang chờ duyệt.
-     */
     public function index(): void
     {
         $this->requireRole('thu_thu', 'quan_tri');
 
-        $requestModel = $this->model('LoanRequest');
-        $requests = $requestModel->getPendingRequests();
+        $m = $this->model('LoanRequest');
+        $m->expireOverdueHolds();
 
         $this->view('loan_requests/index', [
             'title' => 'Yêu cầu mượn sách',
-            'requests' => $requests,
+            'pending' => $m->getPendingRequests(),
+            'approved' => $m->getApprovedHolds(),
+            'closed' => $m->getClosedRequests(40),
+            'hold_hours' => $this->readHoldHours(),
         ]);
     }
 
-    /**
-     * Duyệt yêu cầu mượn sách.
-     */
     public function approve(): void
     {
         $this->requireRole('thu_thu', 'quan_tri');
         $this->requirePost();
 
-        $requestId = filter_input(
-            INPUT_POST,
-            'request_id',
-            FILTER_VALIDATE_INT
-        );
-
-        if (!$requestId || $requestId <= 0) {
-            $this->redirectWithMessage(
-                'error',
-                'Mã yêu cầu mượn không hợp lệ.'
-            );
+        $requestId = (int) filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
+        if ($requestId <= 0) {
+            flash('error', 'Mã yêu cầu mượn không hợp lệ.');
+            $this->redirect(url('loan-requests'));
             return;
         }
 
         $staffId = (int) Auth::id();
-
-        if ($staffId <= 0) {
-            $this->redirectWithMessage(
-                'error',
-                'Vui lòng đăng nhập để tiếp tục.'
-            );
-            return;
-        }
-
-        $requestModel = $this->model('LoanRequest');
-
         try {
-            $requestModel->approveRequest(
-                (int) $requestId,
-                $staffId
+            $this->model('LoanRequest')->approveRequest($requestId, $staffId);
+            flash(
+                'success',
+                'Đã duyệt và giữ chỗ. Độc giả phải tới thư viện lập phiếu trước hạn trên phiếu yêu cầu.'
             );
         } catch (RuntimeException $e) {
-            $this->redirectWithMessage(
-                'error',
-                $e->getMessage()
-            );
-            return;
+            flash('error', $e->getMessage());
         } catch (Throwable $e) {
-            // Ghi chi tiết lỗi vào log máy chủ, không hiển thị
-            // thông tin database nội bộ cho người dùng.
-            error_log(
-                '[LoanRequestsController::approve] ' .
-                $e->getMessage()
-            );
-
-            $this->redirectWithMessage(
-                'error',
-                'Đã xảy ra lỗi khi duyệt yêu cầu. Vui lòng thử lại.'
-            );
-            return;
+            error_log('[LoanRequestsController::approve] ' . $e->getMessage());
+            flash('error', 'Đã xảy ra lỗi khi duyệt yêu cầu. Vui lòng thử lại.');
         }
 
-        $this->redirectWithMessage(
-            'success',
-            'Duyệt yêu cầu thành công! Sách đã được giữ chỗ.'
-        );
+        $this->redirect(url('loan-requests'));
     }
 
-    /**
-     * Từ chối yêu cầu mượn sách.
-     */
     public function reject(): void
     {
         $this->requireRole('thu_thu', 'quan_tri');
         $this->requirePost();
 
-        $requestId = filter_input(
-            INPUT_POST,
-            'request_id',
-            FILTER_VALIDATE_INT
-        );
-
-        if (!$requestId || $requestId <= 0) {
-            $this->redirectWithMessage(
-                'error',
-                'Mã yêu cầu mượn không hợp lệ.'
-            );
+        $requestId = (int) filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
+        if ($requestId <= 0) {
+            flash('error', 'Mã yêu cầu mượn không hợp lệ.');
+            $this->redirect(url('loan-requests'));
             return;
         }
 
-        $staffId = (int) Auth::id();
-
-        if ($staffId <= 0) {
-            $this->redirectWithMessage(
-                'error',
-                'Vui lòng đăng nhập để tiếp tục.'
-            );
-            return;
-        }
-
-        $reason = trim(
-            (string) ($_POST['ly_do_tu_choi'] ?? '')
-        );
-
+        $reason = trim((string) ($_POST['ly_do_tu_choi'] ?? ''));
         if ($reason === '') {
             $reason = 'Yêu cầu không được chấp thuận.';
         }
-
         if (function_exists('mb_substr')) {
             $reason = mb_substr($reason, 0, 255, 'UTF-8');
         } else {
             $reason = substr($reason, 0, 255);
         }
 
-        $requestModel = $this->model('LoanRequest');
-
         try {
-            $requestModel->rejectRequest(
-                (int) $requestId,
-                $staffId,
-                $reason
-            );
+            $this->model('LoanRequest')->rejectRequest($requestId, (int) Auth::id(), $reason);
+            flash('success', 'Đã từ chối yêu cầu mượn sách.');
         } catch (RuntimeException $e) {
-            $this->redirectWithMessage(
-                'error',
-                $e->getMessage()
-            );
-            return;
+            flash('error', $e->getMessage());
         } catch (Throwable $e) {
-            error_log(
-                '[LoanRequestsController::reject] ' .
-                $e->getMessage()
-            );
-
-            $this->redirectWithMessage(
-                'error',
-                'Đã xảy ra lỗi khi từ chối yêu cầu. Vui lòng thử lại.'
-            );
-            return;
+            error_log('[LoanRequestsController::reject] ' . $e->getMessage());
+            flash('error', 'Đã xảy ra lỗi khi từ chối yêu cầu.');
         }
 
-        $this->redirectWithMessage(
-            'success',
-            'Đã từ chối yêu cầu mượn sách.'
-        );
+        $this->redirect(url('loan-requests'));
     }
 
-    /**
-     * Quay lại trang yêu cầu và gửi thông báo qua URL.
-     */
-    private function redirectWithMessage(
-        string $type,
-        string $message
-    ): void {
-        $allowedTypes = ['success', 'error'];
+    public function fulfill(): void
+    {
+        $this->requireRole('thu_thu', 'quan_tri');
+        $this->requirePost();
 
-        if (!in_array($type, $allowedTypes, true)) {
-            $type = 'error';
+        $requestId = (int) filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
+        if ($requestId <= 0) {
+            flash('error', 'Mã yêu cầu không hợp lệ.');
+            $this->redirect(url('loan-requests'));
+            return;
         }
 
-        $this->redirect(
-            url('loan-requests') .
-            '?' . $type . '=' . rawurlencode($message)
-        );
+        try {
+            $this->model('LoanRequest')->fulfillToLoan($requestId, (int) Auth::id());
+            flash('success', 'Đã lập phiếu mượn từ yêu cầu giữ chỗ #' . $requestId . '.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[LoanRequestsController::fulfill] ' . $e->getMessage());
+            flash('error', 'Không lập được phiếu mượn. Vui lòng thử lại.');
+        }
+
+        $this->redirect(url('loan-requests'));
+    }
+
+    public function mine(): void
+    {
+        $this->requireRole('doc_gia');
+
+        $rows = $this->model('LoanRequest')->getByReaderId((int) Auth::id());
+
+        $this->view('loan_requests/mine', [
+            'title' => 'Yêu cầu mượn của tôi',
+            'requests' => $rows,
+        ]);
+    }
+
+    public function store(): void
+    {
+        $this->requireRole('doc_gia');
+        $this->requirePost();
+
+        $bookId = (int) filter_input(INPUT_POST, 'sach_id', FILTER_VALIDATE_INT);
+        $note = trim((string) ($_POST['ghi_chu'] ?? ''));
+
+        if ($bookId <= 0) {
+            flash('error', 'Đầu sách không hợp lệ.');
+            $this->redirect(url('catalog'));
+            return;
+        }
+
+        try {
+            $this->model('LoanRequest')->createRequest((int) Auth::id(), $bookId, $note);
+            flash('success', 'Đã gửi yêu cầu mượn. Vui lòng chờ thủ thư duyệt.');
+            $this->redirect(url('loan-requests/mine'));
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            $this->redirect(url('catalog/show/' . $bookId));
+        } catch (Throwable $e) {
+            error_log('[LoanRequestsController::store] ' . $e->getMessage());
+            flash('error', 'Không gửi được yêu cầu. Vui lòng thử lại.');
+            $this->redirect(url('catalog'));
+        }
+    }
+
+    private function readHoldHours(): int
+    {
+        try {
+            $pdo = Database::getInstance()->getConnection();
+            $st = $pdo->query("SELECT gia_tri FROM cau_hinh WHERE khoa = 'so_gio_giu_sach' LIMIT 1");
+            $v = $st ? $st->fetchColumn() : false;
+            if ($v !== false && is_numeric($v) && (int) $v >= 1) {
+                return (int) $v;
+            }
+            $st = $pdo->query("SELECT gia_tri FROM cau_hinh WHERE khoa = 'so_ngay_giu_sach' LIMIT 1");
+            $v = $st ? $st->fetchColumn() : false;
+            if ($v !== false && is_numeric($v) && (int) $v >= 1) {
+                return (int) $v * 24;
+            }
+        } catch (Throwable $e) {
+            // ignore
+        }
+        return 12;
     }
 }

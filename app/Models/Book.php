@@ -1,4 +1,3 @@
-
 <?php
 
 class Book extends Model
@@ -7,11 +6,17 @@ class Book extends Model
     {
         $sql = "SELECT s.id, s.isbn, s.ten_sach, s.nha_xuat_ban,
                        s.nam_xuat_ban, s.ngon_ngu, s.danh_muc_id,
+                       s.mo_ta, s.anh_bia,
                        dm.ten AS ten_danh_muc,
                        (SELECT COUNT(*)
                           FROM ban_sao bs
                          WHERE bs.sach_id = s.id
-                           AND bs.xoa_luc IS NULL) AS tong_ban_sao
+                           AND bs.xoa_luc IS NULL) AS tong_ban_sao,
+                       (SELECT COUNT(*)
+                          FROM ban_sao bs
+                         WHERE bs.sach_id = s.id
+                           AND bs.xoa_luc IS NULL
+                           AND bs.trang_thai = 'con_trong') AS so_con_trong
                   FROM sach s
                   JOIN danh_muc dm ON dm.id = s.danh_muc_id
                  WHERE s.xoa_luc IS NULL";
@@ -33,6 +38,16 @@ class Book extends Model
         $sql .= " ORDER BY s.id DESC";
 
         return $this->fetchAll($sql, $params);
+    }
+
+    public function all(): array
+    {
+        return $this->getAll('');
+    }
+
+    public function search(string $keyword): array
+    {
+        return $this->getAll(trim($keyword));
     }
 
     public function findById(int $id): ?array
@@ -120,8 +135,6 @@ class Book extends Model
             $data['mo_ta'] !== '' ? $data['mo_ta'] : null,
         ];
 
-        // Chỉ cập nhật ảnh khi có ảnh mới được tải lên.
-        // Nếu không chọn ảnh mới, giữ nguyên ảnh hiện tại.
         if (!empty($data['anh_bia'])) {
             $sql .= ", anh_bia = ?";
             $params[] = $data['anh_bia'];

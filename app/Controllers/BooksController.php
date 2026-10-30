@@ -95,7 +95,7 @@ private function uploadCover(?string $currentPath = null): ?string
         ]);
     }
 
-    // GET /books/show/{id}
+        // GET /books/show/{id}
     public function show($id): void
     {
         $id = (int) $id;
@@ -113,12 +113,23 @@ private function uploadCover(?string $currentPath = null): ?string
             return;
         }
 
+        $copies = $this->model('Copy')->getByBookIdWithLoan($id);
+        $soConTrong = 0;
+        foreach ($copies as $c) {
+            if (($c['trang_thai'] ?? '') === 'con_trong') {
+                $soConTrong++;
+            }
+        }
+
         $this->view('books/show', [
             'title' => 'Chi tiết sách',
             'book' => $book,
+            'copies' => $copies,
+            'so_con_trong' => $soConTrong,
+            'tong_ban_sao' => count($copies),
         ]);
     }
-
+  
     // GET /books/create
     public function create(): void
     {
