@@ -9,7 +9,7 @@ class AuthController extends Controller
     public function login()
     {
         if (Auth::check()) {
-            $this->redirect(url());
+            $this->redirect($this->homeForRole(Auth::user()['vai_tro'] ?? ''));
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -51,7 +51,13 @@ class AuthController extends Controller
                 } else {
                     Auth::login($user);
                     flash('success', 'Xin chào, ' . $user['ho_ten'] . '!');
-                    $this->redirect(Auth::pullIntended() ?? url());
+
+                    // Ưu tiên URL intended (nếu có), không thì theo vai trò
+                    $intended = Auth::pullIntended();
+                    if ($intended) {
+                        $this->redirect($intended);
+                    }
+                    $this->redirect($this->homeForRole($user['vai_tro'] ?? ''));
                 }
             } else {
                 $errors['login'] = 'Email hoặc mật khẩu không đúng.';
@@ -63,6 +69,18 @@ class AuthController extends Controller
             'errors' => $errors,
             'email'  => $email,
         ]);
+    }
+
+    /**
+     * Trang mặc định sau đăng nhập theo vai trò.
+     * thu_thu / quan_tri → thống kê; doc_gia → trang chủ.
+     */
+    private function homeForRole(string $role): string
+    {
+        if ($role === 'thu_thu' || $role === 'quan_tri') {
+            return url('reports/stats');
+        }
+        return url(); // độc giả / mặc định
     }
 
     // Chỉ nhận POST + CSRF
