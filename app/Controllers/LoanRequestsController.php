@@ -147,6 +147,32 @@ class LoanRequestsController extends Controller
         }
     }
 
+    // POST /loan-requests/cancel — độc giả tự hủy yêu cầu của mình
+    public function cancel(): void
+    {
+        $this->requireRole('doc_gia');
+        $this->requirePost();
+
+        $requestId = (int) filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
+        if ($requestId <= 0) {
+            flash('error', 'Mã yêu cầu mượn không hợp lệ.');
+            $this->redirect(url('loan-requests/mine'));
+            return;
+        }
+
+        try {
+            $this->model('LoanRequest')->cancelRequest($requestId, (int) Auth::id());
+            flash('success', 'Đã hủy yêu cầu mượn.');
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[LoanRequestsController::cancel] ' . $e->getMessage());
+            flash('error', 'Không hủy được yêu cầu. Vui lòng thử lại.');
+        }
+
+        $this->redirect(url('loan-requests/mine'));
+    }
+
     private function readHoldHours(): int
     {
         try {

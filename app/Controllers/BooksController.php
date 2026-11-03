@@ -88,15 +88,18 @@ private function uploadCover(?string $currentPath = null): ?string
 
         $bookModel = $this->model('Book');
 
+        $pagination = paginate($bookModel->countBooks($keyword), 10);
+
         $this->view('books/index', [
             'title' => 'Quản lý sách',
-            'books' => $bookModel->getAll($keyword),
+            'books' => $bookModel->getAll($keyword, $pagination['per_page'], $pagination['offset']),
             'keyword' => $keyword,
+            'pagination' => $pagination,
         ]);
     }
 
         // GET /books/show/{id}
-    public function show($id): void
+    public function show(int $id): void
     {
         $id = (int) $id;
 
@@ -156,6 +159,7 @@ private function uploadCover(?string $currentPath = null): ?string
             'nam_xuat_ban' => input('nam_xuat_ban'),
             'ngon_ngu' => input('ngon_ngu', 'vi'),
             'mo_ta' => input('mo_ta'),
+            'tac_gia' => input('tac_gia'),
         ];
 
         $bookModel = $this->model('Book');
@@ -228,7 +232,8 @@ private function uploadCover(?string $currentPath = null): ?string
             $form['anh_bia'] = $this->uploadCover();
 
             // Lưu thông tin sách cùng đường dẫn ảnh.
-            $bookModel->create($form);
+            $bookId = $bookModel->create($form);
+            $bookModel->syncAuthors($bookId, $form['tac_gia'] ?? '');
 
             flash('success', 'Thêm sách mới thành công.');
             $this->redirect(url('books'));
@@ -252,7 +257,7 @@ private function uploadCover(?string $currentPath = null): ?string
 
     }
     // GET /books/edit/{id}
-public function edit($id): void
+public function edit(int $id): void
 {
     $id = (int) $id;
 
@@ -269,17 +274,20 @@ public function edit($id): void
         return;
     }
 
+    $form = $book;
+    $form['tac_gia'] = $bookModel->getAuthorsForBook($id);
+
     $this->view('books/edit', [
         'title' => 'Sửa thông tin sách',
         'book' => $book,
         'categories' => $bookModel->getCategories(),
         'errors' => [],
-        'form' => $book,
+        'form' => $form,
     ]);
 }
 
 // POST /books/update/{id}
-public function update($id): void
+public function update(int $id): void
 {
     $this->requirePost();
 
@@ -306,6 +314,7 @@ public function update($id): void
         'nam_xuat_ban' => input('nam_xuat_ban'),
         'ngon_ngu' => input('ngon_ngu', 'vi'),
         'mo_ta' => input('mo_ta'),
+        'tac_gia' => input('tac_gia'),
     ];
 
     $categories = $bookModel->getCategories();
@@ -374,6 +383,7 @@ public function update($id): void
         );
 
         $bookModel->update($id, $form);
+        $bookModel->syncAuthors($id, $form['tac_gia'] ?? '');
 
         flash('success', 'Cập nhật thông tin sách thành công.');
         $this->redirect(url('books'));

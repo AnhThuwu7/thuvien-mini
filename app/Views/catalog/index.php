@@ -27,7 +27,8 @@ $paginatedBooks = array_slice($books, $offset, $perPage);
 
     <form method="get" action="<?= e(url('catalog')) ?>"
           style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #fff; padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border);">
-        <input type="text" name="keyword" value="<?= e($keyword) ?>"
+        <input type="text" name="keyword" id="keywordInput" value="<?= e($keyword) ?>"
+               list="bookSuggestions" autocomplete="off"
                placeholder="Nhập tên sách..."
                style="flex: 1; min-width: 180px; padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
 
@@ -49,6 +50,8 @@ $paginatedBooks = array_slice($books, $offset, $perPage);
             <option value="con_sach" <?= $status === 'con_sach' ? 'selected' : '' ?>>Còn sách</option>
             <option value="het_sach" <?= $status === 'het_sach' ? 'selected' : '' ?>>Hết sách</option>
         </select>
+
+        <datalist id="bookSuggestions"></datalist>
 
         <button type="submit" class="btn">Tìm kiếm</button>
         <a href="<?= e(url('catalog')) ?>" class="btn btn-outline">Đặt lại</a>
@@ -116,4 +119,57 @@ $paginatedBooks = array_slice($books, $offset, $perPage);
             <?php endfor; ?>
         </div>
     <?php endif; ?>
+
+    <script>
+    // Autocomplete tên sách bằng Fetch API (GET /api/books?q=...)
+    (function () {
+        var input = document.getElementById('keywordInput');
+        var list = document.getElementById('bookSuggestions');
+        if (!input || !list || !window.fetch) { return; }
+
+        var endpoint = <?= json_encode(url('api/books'), JSON_UNESCAPED_SLASHES) ?>;
+        var timer = null;
+        var controller = null;
+
+        function render(items) {
+            list.innerHTML = '';
+            items.forEach(function (b) {
+                var opt = document.createElement('option');
+                opt.value = b.ten_sach;                       // textContent/value: không chèn HTML
+                var info = [];
+                if (b.tac_gia) { info.push(b.tac_gia); }
+                info.push(b.con_lai > 0 ? 'còn ' + b.con_lai + ' bản' : 'hết sách');
+                opt.label = info.join(' · ');
+                list.appendChild(opt);
+            });
+        }
+
+        function load(q) {
+            if (controller) { controller.abort(); }
+            controller = new AbortController();
+
+            fetch(endpoint + '?q=' + encodeURIComponent(q), {
+                headers: { 'Accept': 'application/json' },
+                signal: controller.signal
+            })
+                .then(function (res) {
+                    if (!res.ok) { throw new Error('HTTP ' + res.status); }   // 4xx/5xx: không dùng dữ liệu
+                    return res.json();
+                })
+                .then(function (json) {
+                    render(json && json.ok && Array.isArray(json.data) ? json.data : []);
+                })
+                .catch(function (err) {
+                    if (err.name !== 'AbortError') { render([]); }   // lỗi mạng/server: bỏ gợi ý, form vẫn tìm bình thường
+                });
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            var q = input.value.trim();
+            if (q.length < 2) { render([]); return; }
+            timer = setTimeout(function () { load(q); }, 250);
+        });
+    })();
+    </script>
 </section>

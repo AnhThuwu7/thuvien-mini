@@ -315,7 +315,20 @@ class LoanRequest extends Model
                 throw new RuntimeException('Độc giả không hợp lệ.');
             }
             if ((int) ($user['bi_khoa'] ?? 0) === 1) {
-                throw new RuntimeException('Tài khoản độc giả đang bị khóa.');
+                throw new RuntimeException('Tài khoản độc giả đang bị khóa, không thể lập phiếu mượn.');
+            }
+
+            $overdue = $this->fetchOne(
+                "SELECT COUNT(*) AS total FROM phieu_muon
+                 WHERE nguoi_dung_id = ?
+                   AND tra_luc IS NULL
+                   AND han_tra < CURDATE()",
+                [$userId]
+            );
+            if ((int) ($overdue['total'] ?? 0) > 0) {
+                throw new RuntimeException(
+                    'Độc giả còn sách quá hạn chưa trả, không thể lập phiếu mượn mới.'
+                );
             }
 
             $limitRow = $this->fetchOne(
@@ -415,6 +428,17 @@ class LoanRequest extends Model
             throw new RuntimeException('Tài khoản đang bị khóa, không thể gửi yêu cầu mượn.');
         }
 
+        $overdue = $this->fetchOne(
+            "SELECT COUNT(*) AS total FROM phieu_muon
+             WHERE nguoi_dung_id = ?
+               AND tra_luc IS NULL
+               AND han_tra < CURDATE()",
+            [$userId]
+        );
+        if ((int) ($overdue['total'] ?? 0) > 0) {
+            throw new RuntimeException('Bạn còn sách quá hạn chưa trả, không thể gửi yêu cầu mượn mới.');
+        }
+
         $book = $this->fetchOne(
             "SELECT id FROM sach WHERE id = ? AND xoa_luc IS NULL LIMIT 1",
             [$bookId]
@@ -444,19 +468,105 @@ class LoanRequest extends Model
             throw new RuntimeException('Hiện không còn bản sao trống. Không thể gửi yêu cầu mượn.');
         }
 
+        // Hạn mức: sách đang mượn + yêu cầu còn hiệu lực không được vượt số sách tối đa
+        $maxRow = $this->fetchOne(
+            "SELECT gia_tri FROM cau_hinh WHERE khoa = 'so_sach_toi_da' LIMIT 1"
+        );
+        $maxBooks = ($maxRow && is_numeric($maxRow['gia_tri']) && (int) $maxRow['gia_tri'] >= 1)
+            ? (int) $maxRow['gia_tri']
+            : 5;
+
+        $borrowing = $this->fetchOne(
+            "SELECT COUNT(*) AS total FROM phieu_muon
+             WHERE nguoi_dung_id = ? AND tra_luc IS NULL",
+            [$userId]
+        );
+        $pending = $this->fetchOne(
+            "SELECT COUNT(*) AS total FROM yeu_cau_muon
+             WHERE nguoi_dung_id = ? AND trang_thai IN ('cho_duyet', 'da_duyet')",
+            [$userId]
+        );
+        $used = (int) ($borrowing['total'] ?? 0) + (int) ($pending['total'] ?? 0);
+        if ($used >= $maxBooks) {
+            throw new RuntimeException(
+                'Bạn đã đạt hạn mức ' . $maxBooks . ' sách (gồm sách đang mượn và yêu cầu đang xử lý). '
+                . 'Hãy trả sách hoặc hủy bớt yêu cầu trước khi gửi thêm.'
+            );
+        }
+
         if (function_exists('mb_substr')) {
             $note = mb_substr(trim($note), 0, 255, 'UTF-8');
         } else {
             $note = substr(trim($note), 0, 255);
         }
 
-        $this->execute(
-            "INSERT INTO yeu_cau_muon (nguoi_dung_id, sach_id, trang_thai, ghi_chu, yeu_cau_luc)
-             VALUES (?, ?, 'cho_duyet', ?, NOW())",
-            [$userId, $bookId, $note !== '' ? $note : null]
-        );
+        try {
+            $this->execute(
+                "INSERT INTO yeu_cau_muon (nguoi_dung_id, sach_id, trang_thai, ghi_chu, yeu_cau_luc)
+                 VALUES (?, ?, 'cho_duyet', ?, NOW())",
+                [$userId, $bookId, $note !== '' ? $note : null]
+            );
+        } catch (PDOException $e) {
+            // Bấm gửi 2 lần cùng lúc: ràng buộc UNIQUE (khoa_hieu_luc) chặn yêu cầu trùng
+            if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+                throw new RuntimeException('Bạn đã có yêu cầu đang chờ xử lý cho đầu sách này.');
+            }
+            throw $e;
+        }
 
         return $this->lastInsertId();
+    }
+
+    /**
+     * Độc giả tự hủy yêu cầu của chính mình (chờ duyệt hoặc đã duyệt/giữ chỗ).
+     * Nếu đang giữ chỗ thì trả bản sao về trạng thái còn trống.
+     */
+    public function cancelRequest(int $requestId, int $userId): void
+    {
+        if ($requestId <= 0 || $userId <= 0) {
+            throw new RuntimeException('Dữ liệu hủy yêu cầu không hợp lệ.');
+        }
+
+        $this->transaction(function () use ($requestId, $userId): void {
+            $req = $this->fetchOne(
+                "SELECT id, nguoi_dung_id, trang_thai, ban_sao_id
+                 FROM yeu_cau_muon
+                 WHERE id = ?
+                 FOR UPDATE",
+                [$requestId]
+            );
+
+            // Không phải yêu cầu của mình thì coi như không tồn tại (không lộ dữ liệu người khác)
+            if (!$req || (int) $req['nguoi_dung_id'] !== $userId) {
+                throw new RuntimeException('Không tìm thấy yêu cầu mượn của bạn.');
+            }
+
+            if (!in_array($req['trang_thai'], ['cho_duyet', 'da_duyet'], true)) {
+                throw new RuntimeException('Chỉ hủy được yêu cầu đang chờ duyệt hoặc đang giữ chỗ.');
+            }
+
+            $n = $this->execute(
+                "UPDATE yeu_cau_muon
+                 SET trang_thai = 'da_huy',
+                     xu_ly_luc = NOW()
+                 WHERE id = ?
+                   AND trang_thai IN ('cho_duyet', 'da_duyet')",
+                [$requestId]
+            );
+            if ($n !== 1) {
+                throw new RuntimeException('Yêu cầu vừa được xử lý bởi thao tác khác. Hãy tải lại trang.');
+            }
+
+            if ($req['trang_thai'] === 'da_duyet' && !empty($req['ban_sao_id'])) {
+                $this->execute(
+                    "UPDATE ban_sao
+                     SET trang_thai = 'con_trong'
+                     WHERE id = ?
+                       AND trang_thai = 'dang_giu_cho'",
+                    [(int) $req['ban_sao_id']]
+                );
+            }
+        });
     }
 
     public function getByReaderId(int $userId): array

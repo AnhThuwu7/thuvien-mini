@@ -56,7 +56,21 @@ class Loan extends Model
 
             if ((int) ($user['bi_khoa'] ?? 0) === 1) {
                 throw new RuntimeException(
-                    'Tài khoản độc giả đang bị khóa.'
+                    'Tài khoản độc giả đang bị khóa, không thể mượn sách.'
+                );
+            }
+
+            $overdue = $this->fetchOne(
+                "SELECT COUNT(*) AS total
+                 FROM phieu_muon
+                 WHERE nguoi_dung_id = ?
+                   AND tra_luc IS NULL
+                   AND han_tra < CURDATE()",
+                [$userId]
+            );
+            if ((int) ($overdue['total'] ?? 0) > 0) {
+                throw new RuntimeException(
+                    'Độc giả còn sách quá hạn chưa trả, không thể mượn thêm.'
                 );
             }
 
@@ -158,12 +172,14 @@ class Loan extends Model
 
     // ===== GIỮ NGUYÊN TỪ ĐÂY XUỐNG (getHistoryByReaderId, returnBook, ...) =====
 
-    public function getHistoryByReaderId(int $readerId): array
+        public function getHistoryByReaderId(int $readerId): array
     {
         $sql = "
             SELECT
                 pm.id AS phieu_muon_id,
+                s.id AS sach_id,
                 s.ten_sach,
+                s.anh_bia,
                 bs.ma_ban_sao,
                 pm.muon_luc,
                 pm.han_tra,
@@ -171,22 +187,77 @@ class Loan extends Model
                 pm.tinh_trang_tra,
                 pm.tien_phat,
                 CASE
-                    WHEN pm.tra_luc IS NOT NULL
-                        THEN 'da_tra'
-                    WHEN pm.han_tra < CURDATE()
-                        THEN 'qua_han'
+                    WHEN pm.tra_luc IS NOT NULL THEN 'da_tra'
+                    WHEN pm.han_tra < CURDATE() THEN 'qua_han'
                     ELSE 'dang_muon'
                 END AS trang_thai_hien_thi
             FROM phieu_muon AS pm
-            INNER JOIN ban_sao AS bs
-                ON pm.ban_sao_id = bs.id
-            INNER JOIN sach AS s
-                ON bs.sach_id = s.id
+            INNER JOIN ban_sao AS bs ON pm.ban_sao_id = bs.id
+            INNER JOIN sach AS s ON bs.sach_id = s.id
             WHERE pm.nguoi_dung_id = ?
             ORDER BY pm.muon_luc DESC, pm.id DESC
         ";
-
         return $this->fetchAll($sql, [$readerId]);
+    }
+
+    public function getActiveLoansByReaderId(int $readerId): array
+    {
+        $sql = "
+            SELECT
+                pm.id AS phieu_muon_id,
+                s.id AS sach_id,
+                s.ten_sach,
+                s.anh_bia,
+                s.nha_xuat_ban,
+                bs.ma_ban_sao,
+                pm.muon_luc,
+                pm.han_tra,
+                CASE
+                    WHEN pm.han_tra < CURDATE() THEN 'qua_han'
+                    ELSE 'dang_muon'
+                END AS trang_thai_hien_thi,
+                DATEDIFF(pm.han_tra, CURDATE()) AS so_ngay_con_lai
+            FROM phieu_muon AS pm
+            INNER JOIN ban_sao AS bs ON pm.ban_sao_id = bs.id
+            INNER JOIN sach AS s ON bs.sach_id = s.id
+            WHERE pm.nguoi_dung_id = ?
+              AND pm.tra_luc IS NULL
+            ORDER BY pm.han_tra ASC, pm.id ASC
+        ";
+        return $this->fetchAll($sql, [$readerId]);
+    }
+
+    public function findLoanForReader(int $loanId, int $readerId): ?array
+    {
+        return $this->fetchOne(
+            "SELECT
+                pm.id AS phieu_muon_id,
+                s.id AS sach_id,
+                s.ten_sach,
+                s.anh_bia,
+                s.isbn,
+                s.nha_xuat_ban,
+                s.nam_xuat_ban,
+                bs.ma_ban_sao,
+                bs.vi_tri_ke,
+                pm.muon_luc,
+                pm.han_tra,
+                pm.tra_luc,
+                pm.tinh_trang_tra,
+                pm.tien_phat,
+                CASE
+                    WHEN pm.tra_luc IS NOT NULL THEN 'da_tra'
+                    WHEN pm.han_tra < CURDATE() THEN 'qua_han'
+                    ELSE 'dang_muon'
+                END AS trang_thai_hien_thi
+             FROM phieu_muon AS pm
+             INNER JOIN ban_sao AS bs ON pm.ban_sao_id = bs.id
+             INNER JOIN sach AS s ON bs.sach_id = s.id
+             WHERE pm.id = ?
+               AND pm.nguoi_dung_id = ?
+             LIMIT 1",
+            [$loanId, $readerId]
+        );
     }
 
     private function loanFilterSql(

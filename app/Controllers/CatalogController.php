@@ -4,8 +4,6 @@ class CatalogController extends Controller
 {
     public function index(): void
     {
-        $this->requireLogin();
-
         $bookModel = $this->model('Book');
         $keyword = trim((string) ($_GET['keyword'] ?? ''));
         $publisher = trim((string) ($_GET['publisher'] ?? ''));
@@ -41,20 +39,27 @@ class CatalogController extends Controller
             'publisher' => $publisher,
             'category' => $category,
             'status' => $status,
+            'isReader' => Auth::check() && Auth::hasRole('doc_gia'),
+            'isGuest' => !Auth::check(),
+            'isStaff' => Auth::check() && Auth::hasRole('thu_thu', 'quan_tri'),
         ]);
     }
 
     public function show(int $id): void
     {
-        $this->requireLogin();
-
-        $book = $this->model('Book')->findById($id);
+        $bookModel = $this->model('Book');
+        $book = $bookModel->findById($id);
         if ($book === null) {
             $this->abort(404);
         }
 
+        $tenTacGia = $bookModel->getAuthorsForBook($id);
+        if ($tenTacGia === '' && !empty($book['ten_tac_gia'])) {
+            $tenTacGia = (string) $book['ten_tac_gia'];
+        }
+
         $tenDanhMuc = '';
-        foreach ($this->model('Book')->getCategories() as $c) {
+        foreach ($bookModel->getCategories() as $c) {
             if ((int) $c['id'] === (int) ($book['danh_muc_id'] ?? 0)) {
                 $tenDanhMuc = $c['ten'];
                 break;
@@ -73,9 +78,30 @@ class CatalogController extends Controller
             'title' => $book['ten_sach'] ?? 'Chi tiết sách',
             'book' => $book,
             'ten_danh_muc' => $tenDanhMuc,
+            'ten_tac_gia' => $tenTacGia,
             'copies' => $copies,
             'so_con_trong' => $soConTrong,
             'tong_ban_sao' => count($copies),
+            'isReader' => Auth::check() && Auth::hasRole('doc_gia'),
+            'isGuest' => !Auth::check(),
+            'isStaff' => Auth::check() && Auth::hasRole('thu_thu', 'quan_tri'),
         ]);
+    }
+
+    public function request(int $id): void
+    {
+        if (Auth::check() && Auth::hasRole('thu_thu', 'quan_tri')) {
+            flash('info', 'Thủ thư/admin lập phiếu mượn tại mục Mượn–Trả.');
+            $this->redirect(url('loans'));
+            return;
+        }
+
+        $this->requireLogin();
+
+        if (!Auth::hasRole('doc_gia')) {
+            $this->abort(403);
+        }
+
+        $this->redirect(url('catalog/show/' . $id));
     }
 }

@@ -1,4 +1,3 @@
-
 <?php
 
 class CopiesController extends Controller
@@ -11,6 +10,12 @@ class CopiesController extends Controller
         'mat',
         'thanh_ly',
     ];
+
+    /** Trạng thái do hệ thống tự đặt (lập phiếu mượn / duyệt giữ chỗ) – không cho sửa tay */
+    private const SYSTEM_STATUSES = ['dang_giu_cho', 'dang_muon'];
+
+    /** Trạng thái thủ thư được phép chọn khi thêm / sửa bản sao */
+    private const MANUAL_STATUSES = ['con_trong', 'hong', 'mat', 'thanh_ly'];
 
     public function __construct()
     {
@@ -29,12 +34,15 @@ class CopiesController extends Controller
 
         $copyModel = $this->model('Copy');
 
+        $pagination = paginate($copyModel->countAll($keyword, $status), 10);
+
         $this->view('copies/index', [
             'title' => 'Quản lý bản sao sách',
-            'copies' => $copyModel->getAll($keyword, $status),
+            'copies' => $copyModel->getAll($keyword, $status, $pagination['per_page'], $pagination['offset']),
             'keyword' => $keyword,
             'status' => $status,
             'statuses' => self::STATUSES,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -46,7 +54,7 @@ class CopiesController extends Controller
         $this->view('copies/create', [
             'title' => 'Thêm bản sao',
             'books' => $copyModel->getBooks(),
-            'statuses' => self::STATUSES,
+            'statuses' => self::MANUAL_STATUSES,
             'errors' => [],
             'form' => [
                 'sach_id' => '',
@@ -107,7 +115,7 @@ class CopiesController extends Controller
             $this->view('copies/create', [
                 'title' => 'Thêm bản sao',
                 'books' => $books,
-                'statuses' => self::STATUSES,
+                'statuses' => self::MANUAL_STATUSES,
                 'errors' => $errors,
                 'form' => $form,
             ]);
@@ -118,11 +126,19 @@ class CopiesController extends Controller
             $copyModel->create($form);
             flash('success', 'Thêm bản sao sách thành công.');
             $this->redirect(url('copies'));
+        } catch (RuntimeException $e) {
+            $this->view('copies/create', [
+                'title' => 'Thêm bản sao',
+                'books' => $books,
+                'statuses' => self::MANUAL_STATUSES,
+                'errors' => [$e->getMessage()],
+                'form' => $form,
+            ]);
         } catch (PDOException $e) {
             $this->view('copies/create', [
                 'title' => 'Thêm bản sao',
                 'books' => $books,
-                'statuses' => self::STATUSES,
+                'statuses' => self::MANUAL_STATUSES,
                 'errors' => [
                     'Không thể thêm bản sao. Hãy kiểm tra mã bản sao và dữ liệu nhập.'
                 ],
@@ -151,7 +167,7 @@ class CopiesController extends Controller
             'title' => 'Sửa bản sao',
             'copy' => $copy,
             'books' => $copyModel->getBooks(),
-            'statuses' => self::STATUSES,
+            'statuses' => $this->editableStatuses($copy['trang_thai']),
             'errors' => [],
             'form' => $copy,
         ]);
@@ -177,14 +193,22 @@ class CopiesController extends Controller
 
         $form = $this->readForm();
         $books = $copyModel->getBooks();
-        $errors = $this->validateForm($form, $copyModel, $books, $id);
+        $statuses = $this->editableStatuses($copy['trang_thai']);
+
+        // Đang mượn / giữ chỗ: bỏ qua dữ liệu trạng thái & đầu sách gửi lên, giữ nguyên giá trị hiện tại
+        if (in_array($copy['trang_thai'], self::SYSTEM_STATUSES, true)) {
+            $form['trang_thai'] = $copy['trang_thai'];
+            $form['sach_id'] = (string) $copy['sach_id'];
+        }
+
+        $errors = $this->validateForm($form, $copyModel, $books, $id, $statuses);
 
         if ($errors) {
             $this->view('copies/edit', [
                 'title' => 'Sửa bản sao',
                 'copy' => $copy,
                 'books' => $books,
-                'statuses' => self::STATUSES,
+                'statuses' => $statuses,
                 'errors' => $errors,
                 'form' => $form,
             ]);
@@ -195,12 +219,21 @@ class CopiesController extends Controller
             $copyModel->update($id, $form);
             flash('success', 'Cập nhật bản sao thành công.');
             $this->redirect(url('copies'));
+        } catch (RuntimeException $e) {
+            $this->view('copies/edit', [
+                'title' => 'Sửa bản sao',
+                'copy' => $copy,
+                'books' => $books,
+                'statuses' => $statuses,
+                'errors' => [$e->getMessage()],
+                'form' => $form,
+            ]);
         } catch (PDOException $e) {
             $this->view('copies/edit', [
                 'title' => 'Sửa bản sao',
                 'copy' => $copy,
                 'books' => $books,
-                'statuses' => self::STATUSES,
+                'statuses' => $statuses,
                 'errors' => [
                     'Không thể cập nhật bản sao. Hãy kiểm tra mã bản sao và dữ liệu nhập.'
                 ],
@@ -250,6 +283,18 @@ class CopiesController extends Controller
         $this->redirect(url('copies'));
     }
 
+    /**
+     * Danh sách trạng thái được phép chọn trong form sửa.
+     * Bản sao đang mượn / giữ chỗ chỉ hiển thị đúng trạng thái hiện tại (không đổi được).
+     */
+    private function editableStatuses(string $current): array
+    {
+        if (in_array($current, self::SYSTEM_STATUSES, true)) {
+            return [$current];
+        }
+        return self::MANUAL_STATUSES;
+    }
+
     private function readForm(): array
     {
         return [
@@ -266,7 +311,8 @@ class CopiesController extends Controller
         array $form,
         Copy $copyModel,
         array $books,
-        ?int $excludeId = null
+        ?int $excludeId = null,
+        ?array $allowedStatuses = null
     ): array {
         $errors = [];
 
@@ -290,7 +336,7 @@ class CopiesController extends Controller
             $errors[] = 'Mã bản sao này đã tồn tại.';
         }
 
-        if (!in_array($form['trang_thai'], self::STATUSES, true)) {
+        if (!in_array($form['trang_thai'], $allowedStatuses ?? self::MANUAL_STATUSES, true)) {
             $errors[] = 'Trạng thái bản sao không hợp lệ.';
         }
 

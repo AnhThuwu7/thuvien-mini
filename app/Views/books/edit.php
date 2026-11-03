@@ -1,8 +1,8 @@
-
 <?php
 $form = $form ?? [];
 $errors = $errors ?? [];
 $categories = $categories ?? [];
+$book = $book ?? [];
 ?>
 
 <section style="max-width: 850px; margin: 0 auto; padding: 1.5rem 0;">
@@ -38,6 +38,20 @@ $categories = $categories ?? [];
                    maxlength="255" required
                    value="<?= e($form['ten_sach'] ?? '') ?>"
                    style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+            <label for="tac_gia" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Tác giả
+            </label>
+            <input id="tac_gia" name="tac_gia" type="text"
+                   maxlength="255"
+                   value="<?= e($form['tac_gia'] ?? '') ?>"
+                   placeholder="Nhập tên tác giả (nhiều tác giả cách nhau bằng dấu phẩy)"
+                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">
+                Để trống nếu chưa có thông tin. Nhiều tác giả thì ghi cách nhau bằng dấu phẩy.
+            </p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem;">

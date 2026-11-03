@@ -2,28 +2,49 @@
 if (!defined('APP_DEBUG')) {
     define('APP_DEBUG', false);
 }
+
 class HomeController extends Controller
 {
     public function index(): void
     {
-        $this->view('home/index', ['title' => 'Trang chủ']);
+        if (Auth::check() && Auth::hasRole('thu_thu', 'quan_tri')) {
+            $this->redirect(url('reports/stats'));
+            return;
+        }
+
+        $bookModel = $this->model('Book');
+        $keyword = trim((string) ($_GET['q'] ?? ''));
+        $books = $keyword !== ''
+            ? $bookModel->search($keyword)
+            : $bookModel->all();
+
+        $activeLoans = [];
+        if (Auth::check() && Auth::hasRole('doc_gia')) {
+            $activeLoans = $this->model('Loan')->getActiveLoansByReaderId((int) Auth::id());
+        }
+
+        $this->view('home/index', [
+            'title' => 'Thư viện mini',
+            'books' => $books,
+            'keyword' => $keyword,
+            'activeLoans' => $activeLoans,
+            'isReader' => Auth::check() && Auth::hasRole('doc_gia'),
+            'isGuest' => !Auth::check(),
+        ]);
     }
 
-    // Kiểm tra nhanh kết nối CSDL, trả JSON. Chỉ hoạt động khi APP_DEBUG = true.
-    // (Chỉ để thử khung MVC; các chức năng thật phải truy vấn qua Model.)
     public function ping(): void
     {
         if (!APP_DEBUG) {
-            abort(404);
+            $this->abort(404);
         }
         try {
-            $pdo    = Database::getInstance()->getConnection();
+            $pdo = Database::getInstance()->getConnection();
             $soSach = (int) $pdo->query('SELECT COUNT(*) FROM sach')->fetchColumn();
             $this->jsonSuccess(['so_sach' => $soSach]);
         } catch (Throwable $e) {
             error_log('[ping] ' . $e->getMessage());
-            $this->jsonError('Không truy vấn được CSDL. Đã import schema.sql và seed.sql chưa?', 500);
+            $this->jsonError('Không truy vấn được CSDL.', 500);
         }
     }
 }
- 

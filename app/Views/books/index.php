@@ -114,32 +114,10 @@
                                 <?= (int) ($book['tong_ban_sao'] ?? 0) ?>
                             </td>
 
-                            <!-- Nút sửa thông tin sách -->
                             <td style="padding: 0.85rem; text-align: center; white-space: nowrap;">
-    <a
-        href="<?= e(url('books/edit/' . (int) $book['id'])) ?>"
-        class="btn"
-    >
-        Sửa
-    </a>
-
-    <form
-        method="POST"
-        action="<?= e(url('books/delete/' . (int) $book['id'])) ?>"
-        style="display: inline;"
-        onsubmit="return confirm('Xóa đầu sách này khỏi danh mục?\n\nChỉ xóa được khi không còn bản sao đang dùng (đang mượn, còn trên kệ hoặc giữ chỗ).\nMọi bản sao phải thanh lý trước.');"
-    >
-        <?= csrf_field() ?>
-
-        <button
-            type="submit"
-            class="btn"
-            style="background: #dc2626; color: #fff; border: none; margin-left: 0.25rem;"
-        >
-            Xóa
-        </button>
-    </form>
-</td>
+                                <a href="<?= e(url('books/show/' . (int) $book['id'])) ?>" class="btn btn-outline">Chi tiết</a>
+                                <a href="<?= e(url('books/edit/' . (int) $book['id'])) ?>" class="btn">Sửa</a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -147,8 +125,14 @@
         </table>
     </div>
 
-    <!-- Tổng số sách -->
+    <!-- Tổng số sách + phân trang -->
     <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
-        Tổng số sách đang hiển thị: <?= count($books) ?>
+        Tổng số sách: <?= (int) ($pagination['total'] ?? count($books)) ?>
+        (trang <?= (int) ($pagination['page'] ?? 1) ?>/<?= (int) ($pagination['total_pages'] ?? 1) ?>)
     </p>
+    <?php
+    $pagerPath = 'books';
+    $pagerQuery = ['q' => $keyword ?? ''];
+    require ROOT_PATH . '/app/Views/partials/pager.php';
+    ?>
 </section>

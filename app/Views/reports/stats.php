@@ -6,6 +6,7 @@ $tongDauSach  = (int) ($tongDauSach ?? 0);
 $tongBanSao   = (int) ($tongBanSao ?? 0);
 $tongDocGia   = (int) ($tongDocGia ?? 0);
 $tongLuotMuon = (int) ($tongLuotMuon ?? 0);
+$tyLeQuaHan   = $dangMuon > 0 ? round($quaHan * 100 / $dangMuon, 1) : 0;
 if (!isset($topBooks) || !is_array($topBooks)) {
     $topBooks = [];
 }
@@ -15,157 +16,190 @@ if (!isset($theoThang) || !is_array($theoThang)) {
 if (!isset($trangThaiBanSao) || !is_array($trangThaiBanSao)) {
     $trangThaiBanSao = [];
 }
+
+$statusMeta = [
+    'con_trong'    => ['label' => 'Còn trống',  'color' => '#166534', 'bg' => '#dcfce7'],
+    'dang_muon'    => ['label' => 'Đang mượn',  'color' => '#1e40af', 'bg' => '#dbeafe'],
+    'dang_giu_cho' => ['label' => 'Giữ chỗ',    'color' => '#92400e', 'bg' => '#fef3c7'],
+    'hong'         => ['label' => 'Hỏng',       'color' => '#9f1239', 'bg' => '#ffe4e6'],
+    'mat'          => ['label' => 'Mất',        'color' => '#374151', 'bg' => '#e5e7eb'],
+    'thanh_ly'     => ['label' => 'Thanh lý',   'color' => '#4b5563', 'bg' => '#f3f4f6'],
+];
 ?>
-<div class="container mt-4 mb-5" style="max-width: 1200px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
-        <h2 style="margin:0;">📊 Thống kê Thư viện</h2>
-        <a href="<?= e(url('reports/overdue')) ?>"
-           style="background:#422b1c; color:#fff; padding:8px 14px; border-radius:6px; text-decoration:none; font-size:14px;">
-            Báo cáo quá hạn
-        </a>
+<style>
+.stats-page { max-width: 1200px; margin: 0 auto; padding: 0.5rem 0 2.5rem; }
+.stats-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:1.5rem; }
+.stats-header h1 { margin:0; font-size:1.55rem; color:#3d2b1f; }
+.stats-section-title { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#9a8778; margin:0 0 0.75rem; }
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:1.75rem; }
+.kpi-card {
+    background:#fff; border:1px solid var(--border,#e5ddd3); border-radius:12px;
+    padding:1.1rem 1.15rem; display:flex; flex-direction:column; gap:0.35rem;
+    box-shadow:0 1px 4px rgba(60,40,20,.04);
+}
+.kpi-card .kpi-label { font-size:0.85rem; color:#7a6858; font-weight:500; display:flex; align-items:center; gap:6px; }
+.kpi-card .kpi-value { font-size:1.85rem; font-weight:700; line-height:1.15; color:#3d2b1f; }
+.kpi-card.accent-red    { border-left:4px solid #dc2626; }
+.kpi-card.accent-red .kpi-value { color:#b91c1c; }
+.kpi-card.accent-amber  { border-left:4px solid #d97706; }
+.kpi-card.accent-amber .kpi-value { color:#b45309; }
+.kpi-card.accent-blue   { border-left:4px solid #2563eb; }
+.kpi-card.accent-blue .kpi-value { color:#1d4ed8; }
+.kpi-card.accent-green  { border-left:4px solid #16a34a; }
+.kpi-card.accent-green .kpi-value { color:#15803d; }
+.kpi-card.accent-brown  { border-left:4px solid #8c6239; }
+.kpi-card.accent-slate  { border-left:4px solid #64748b; }
+.stats-two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:1.75rem; }
+.stats-panel { background:#fff; border:1px solid var(--border,#e5ddd3); border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(60,40,20,.04); }
+.stats-panel-head { background:#4a3525; color:#fff; padding:0.85rem 1.15rem; font-size:0.95rem; font-weight:600; }
+.stats-panel-body { padding:0.75rem 1rem 1rem; }
+.stats-table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+.stats-table th { text-align:left; padding:0.55rem 0.5rem; border-bottom:2px solid #e5ddd3; color:#7a6858; font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:.03em; }
+.stats-table td { padding:0.6rem 0.5rem; border-bottom:1px solid #f0ebe6; color:#3d2b1f; }
+.stats-table tr:last-child td { border-bottom:none; }
+.stats-table .num { text-align:center; font-weight:700; color:#6b4e3d; }
+.status-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px; }
+.status-card {
+    border-radius:10px; padding:0.9rem 0.85rem; text-align:center;
+    border:1px solid transparent;
+}
+.status-card .st-val { font-size:1.5rem; font-weight:700; line-height:1.2; }
+.status-card .st-lbl { font-size:0.8rem; margin-top:0.25rem; font-weight:500; }
+@media (max-width:900px) {
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .stats-two-col { grid-template-columns:1fr; }
+}
+@media (max-width:520px) {
+    .kpi-grid { grid-template-columns:1fr; }
+}
+</style>
+
+<div class="stats-page">
+    <div class="stats-header">
+        <h1>📊 Thống kê thư viện</h1>
+        <a href="<?= e(url('reports/overdue')) ?>" class="btn">Báo cáo quá hạn</a>
     </div>
 
-    <!-- Lưới 4 cột – các ô cùng kích thước -->
-    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:24px;">
-        <div style="background:#6b4e3d; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">📖 Đang mượn</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $dangMuon ?></div>
+    <!-- Nhóm 1: Nghiệp vụ mượn – trả (quan trọng nhất với thủ thư) -->
+    <p class="stats-section-title">Nghiệp vụ mượn – trả</p>
+    <div class="kpi-grid">
+        <div class="kpi-card accent-blue">
+            <div class="kpi-label">📖 Đang mượn</div>
+            <div class="kpi-value"><?= $dangMuon ?></div>
         </div>
-        <div style="background:#8b1e1e; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">⚠️ Quá hạn</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $quaHan ?></div>
+        <div class="kpi-card accent-red">
+            <div class="kpi-label">⚠️ Quá hạn</div>
+            <div class="kpi-value"><?= $quaHan ?></div>
         </div>
-        <div style="background:#856404; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">⏰ Sắp đến hạn</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $sapDenHan ?></div>
+        <div class="kpi-card accent-amber">
+            <div class="kpi-label">⏰ Sắp đến hạn</div>
+            <div class="kpi-value"><?= $sapDenHan ?></div>
         </div>
-        <div style="background:#2c3e50; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">🔄 Tổng lượt mượn</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $tongLuotMuon ?></div>
-        </div>
-        <div style="background:#8c6239; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">📚 Đầu sách</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $tongDauSach ?></div>
-        </div>
-        <div style="background:#5c4033; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">📑 Bản sao</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $tongBanSao ?></div>
-        </div>
-        <div style="background:#3d5a3d; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">👥 Độc giả</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;"><?= $tongDocGia ?></div>
-        </div>
-        <div style="background:#4a5568; color:#fff; padding:18px 16px; border-radius:10px; min-height:96px; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:13px; opacity:.9;">📈 Tỷ lệ quá hạn</div>
-            <div style="font-size:28px; font-weight:700; margin-top:6px; line-height:1.2;">
-                <?= $dangMuon > 0 ? round($quaHan * 100 / $dangMuon, 1) : 0 ?>%
-            </div>
+        <div class="kpi-card accent-slate">
+            <div class="kpi-label">📈 Tỷ lệ quá hạn</div>
+            <div class="kpi-value"><?= $tyLeQuaHan ?>%</div>
         </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
-        <div style="background:#fff; border:1px solid #dee2e6; border-radius:10px; overflow:hidden;">
-            <div style="background:#4a3525; color:#fff; padding:12px 18px;">
-                <h5 style="margin:0; font-size:15px;">🔥 Top 5 sách mượn nhiều nhất</h5>
-            </div>
-            <div style="padding:12px 16px;">
+    <!-- Nhóm 2: Kho & độc giả -->
+    <p class="stats-section-title">Kho sách & độc giả</p>
+    <div class="kpi-grid">
+        <div class="kpi-card accent-brown">
+            <div class="kpi-label">📚 Đầu sách</div>
+            <div class="kpi-value"><?= $tongDauSach ?></div>
+        </div>
+        <div class="kpi-card accent-brown">
+            <div class="kpi-label">📑 Bản sao</div>
+            <div class="kpi-value"><?= $tongBanSao ?></div>
+        </div>
+        <div class="kpi-card accent-green">
+            <div class="kpi-label">👥 Độc giả</div>
+            <div class="kpi-value"><?= $tongDocGia ?></div>
+        </div>
+        <div class="kpi-card accent-blue">
+            <div class="kpi-label">🔄 Tổng lượt mượn</div>
+            <div class="kpi-value"><?= $tongLuotMuon ?></div>
+        </div>
+    </div>
+
+    <!-- Hai bảng -->
+    <div class="stats-two-col">
+        <div class="stats-panel">
+            <div class="stats-panel-head">🔥 Top 5 sách mượn nhiều nhất</div>
+            <div class="stats-panel-body">
                 <?php if (!empty($topBooks)): ?>
-                <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                <table class="stats-table">
                     <thead>
-                        <tr style="border-bottom:2px solid #dee2e6; background:#f8f9fa;">
-                            <th style="padding:8px; text-align:left;">#</th>
-                            <th style="padding:8px; text-align:left;">Tên sách</th>
-                            <th style="padding:8px; text-align:center;">Lượt mượn</th>
+                        <tr>
+                            <th style="width:36px;">#</th>
+                            <th>Tên sách</th>
+                            <th class="num">Lượt mượn</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($topBooks as $i => $b): ?>
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px; color:#888;"><?= $i + 1 ?></td>
-                            <td style="padding:8px;"><?= e($b['ten_sach']) ?></td>
-                            <td style="padding:8px; text-align:center; font-weight:700; color:#6b4e3d;"><?= (int)$b['so_luot_muon'] ?></td>
+                        <tr>
+                            <td style="color:#9a8778;"><?= $i + 1 ?></td>
+                            <td><?= e($b['ten_sach']) ?></td>
+                            <td class="num"><?= (int) $b['so_luot_muon'] ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
                 <?php else: ?>
-                <p style="margin:12px 0; color:#6c757d; text-align:center;">Chưa có dữ liệu mượn sách.</p>
+                <p style="margin:12px 0; color:#9a8778; text-align:center;">Chưa có dữ liệu mượn sách.</p>
                 <?php endif; ?>
             </div>
         </div>
 
-        <div style="background:#fff; border:1px solid #dee2e6; border-radius:10px; overflow:hidden;">
-            <div style="background:#4a3525; color:#fff; padding:12px 18px;">
-                <h5 style="margin:0; font-size:15px;">📅 Lượt mượn theo tháng (năm <?= date('Y') ?>)</h5>
-            </div>
-            <div style="padding:12px 16px;">
+        <div class="stats-panel">
+            <div class="stats-panel-head">📅 Lượt mượn theo tháng (<?= date('Y') ?>)</div>
+            <div class="stats-panel-body">
                 <?php if (!empty($theoThang)): ?>
-                <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                <table class="stats-table">
                     <thead>
-                        <tr style="border-bottom:2px solid #dee2e6; background:#f8f9fa;">
-                            <th style="padding:8px; text-align:left;">Tháng</th>
-                            <th style="padding:8px; text-align:center;">Số lượt</th>
+                        <tr>
+                            <th>Tháng</th>
+                            <th class="num">Số lượt</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($theoThang as $t): ?>
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px;">Tháng <?= (int)$t['thang'] ?></td>
-                            <td style="padding:8px; text-align:center; font-weight:700; color:#6b4e3d;"><?= (int)$t['so_luot'] ?></td>
+                        <tr>
+                            <td>Tháng <?= (int) $t['thang'] ?></td>
+                            <td class="num"><?= (int) $t['so_luot'] ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
                 <?php else: ?>
-                <p style="margin:12px 0; color:#6c757d; text-align:center;">Chưa có dữ liệu trong năm nay.</p>
+                <p style="margin:12px 0; color:#9a8778; text-align:center;">Chưa có dữ liệu trong năm nay.</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <div style="background:#fff; border:1px solid #dee2e6; border-radius:10px; overflow:hidden;">
-        <div style="background:#4a3525; color:#fff; padding:12px 18px;">
-            <h5 style="margin:0; font-size:15px;">📦 Phân bố trạng thái bản sao</h5>
-        </div>
-        <div style="padding:12px 16px;">
+    <!-- Phân bố trạng thái bản sao -->
+    <div class="stats-panel">
+        <div class="stats-panel-head">📦 Phân bố trạng thái bản sao</div>
+        <div class="stats-panel-body">
             <?php if (!empty($trangThaiBanSao)): ?>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
-                <?php
-                $labelMap = [
-                    'con_trong' => ['Còn trống', '#6c757d'],
-                    'san_sang'  => ['Sẵn sàng', '#198754'],
-                    'dang_muon' => ['Đang mượn', '#0d6efd'],
-                    'hong'      => ['Hỏng', '#dc3545'],
-                    'mat'       => ['Mất', '#495057'],
-                    'thanh_ly'  => ['Thanh lý', '#adb5bd'],
-                ];
-                foreach ($trangThaiBanSao as $tt):
-                    $key = $tt['trang_thai'];
-                    $info = $labelMap[$key] ?? [$key, '#6c757d'];
-                ?>
-                <div style="background:<?= $info[1] ?>; color:#fff; padding:14px; border-radius:8px; text-align:center; min-height:72px; display:flex; flex-direction:column; justify-content:center;">
-                    <div style="font-size:12px; opacity:.9;"><?= e($info[0]) ?></div>
-                    <div style="font-size:22px; font-weight:700; margin-top:4px;"><?= (int)$tt['so_luong'] ?></div>
-                </div>
+            <div class="status-grid">
+                <?php foreach ($trangThaiBanSao as $row): ?>
+                    <?php
+                        $key = $row['trang_thai'] ?? '';
+                        $meta = $statusMeta[$key] ?? ['label' => $key, 'color' => '#374151', 'bg' => '#f3f4f6'];
+                        $count = (int) ($row['so_luong'] ?? 0);
+                    ?>
+                    <div class="status-card" style="background:<?= e($meta['bg']) ?>; color:<?= e($meta['color']) ?>; border-color:<?= e($meta['color']) ?>22;">
+                        <div class="st-val"><?= $count ?></div>
+                        <div class="st-lbl"><?= e($meta['label']) ?></div>
+                    </div>
                 <?php endforeach; ?>
             </div>
             <?php else: ?>
-            <p style="margin:12px 0; color:#6c757d; text-align:center;">Chưa có bản sao.</p>
+            <p style="margin:12px 0; color:#9a8778; text-align:center;">Chưa có dữ liệu bản sao.</p>
             <?php endif; ?>
         </div>
     </div>
 </div>
-
-<style>
-@media (max-width: 900px) {
-    .container [style*="grid-template-columns:repeat(4"] {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-}
-@media (max-width: 560px) {
-    .container [style*="grid-template-columns:repeat(4"],
-    .container [style*="grid-template-columns:1fr 1fr"] {
-        grid-template-columns: 1fr !important;
-    }
-}
-</style>

@@ -22,3 +22,5 @@ Desktop.ini
 /tmp/
 /storage/uploads/*
 !/storage/uploads/.gitkeep
+/config/.debug
+/storage/login_attempts/

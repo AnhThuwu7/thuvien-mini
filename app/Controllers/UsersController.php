@@ -35,10 +35,16 @@ class UsersController extends Controller
     public function toggleLock(): void
     {
         $this->requirePost();
-        
+
         $id     = (int) input('id');
-        $biKhoa = (int) input('bi_khoa');
-        $lyDo   = input('ly_do_khoa');
+        $biKhoa = input('bi_khoa');
+        $lyDo   = trim(input('ly_do_khoa'));
+
+        if ($id <= 0 || !in_array($biKhoa, ['0', '1'], true)) {
+            flash('error', 'Dữ liệu khóa/mở khóa không hợp lệ.');
+            $this->redirect(url('users'));
+        }
+        $biKhoa = (int) $biKhoa;
 
         // Không cho phép tự thao tác trên tài khoản của chính mình
         if ($id === Auth::id()) {
@@ -47,6 +53,29 @@ class UsersController extends Controller
         }
 
         $userModel = $this->model('User');
+        $target = $userModel->findById($id);
+        if (!$target) {
+            flash('error', 'Không tìm thấy tài khoản.');
+            $this->redirect(url('users'));
+        }
+
+        if ($biKhoa === 1) {
+            if ($lyDo === '') {
+                flash('error', 'Vui lòng nhập lý do khóa tài khoản.');
+                $this->redirect(url('users'));
+            }
+            if (mb_strlen($lyDo) > 255) {
+                flash('error', 'Lý do khóa tối đa 255 ký tự.');
+                $this->redirect(url('users'));
+            }
+        }
+
+        // Đã ở đúng trạng thái yêu cầu thì không coi là lỗi
+        if ((int) ($target['bi_khoa'] ?? 0) === $biKhoa) {
+            flash('info', $biKhoa === 1 ? 'Tài khoản này đã bị khóa trước đó.' : 'Tài khoản này đang hoạt động.');
+            $this->redirect(url('users'));
+        }
+
         $ok = $userModel->updateLockStatus($id, $biKhoa, $lyDo);
 
         if ($ok) {

@@ -98,4 +98,76 @@ class User extends Model
         $sql .= " ORDER BY ho_ten ASC LIMIT 10";
         return $this->fetchAll($sql, $params);
     }
+        public function emailExists(string $email, ?int $exceptId = null): bool
+    {
+        $sql = 'SELECT id FROM nguoi_dung WHERE email = ? AND xoa_luc IS NULL';
+        $params = [$email];
+        if ($exceptId !== null) {
+            $sql .= ' AND id <> ?';
+            $params[] = $exceptId;
+        }
+        $sql .= ' LIMIT 1';
+        return $this->fetchOne($sql, $params) !== null;
+    }
+
+    public function nextReaderCode(): string
+    {
+        $row = $this->fetchOne(
+            "SELECT ma_doc_gia FROM nguoi_dung
+              WHERE ma_doc_gia IS NOT NULL AND ma_doc_gia LIKE 'DG%'
+              ORDER BY id DESC
+              LIMIT 1"
+        );
+        $n = 1;
+        if ($row && preg_match('/(\d+)/', (string) $row['ma_doc_gia'], $m)) {
+            $n = (int) $m[1] + 1;
+        }
+        return 'DG' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function registerReader(string $hoTen, string $email, string $password, ?string $phone = null): int
+    {
+        $hoTen = trim($hoTen);
+        $email = trim(mb_strtolower($email));
+        $phone = $phone !== null ? trim($phone) : null;
+        if ($phone === '') {
+            $phone = null;
+        }
+
+        if ($hoTen === '' || mb_strlen($hoTen) > 100) {
+            throw new RuntimeException('Họ tên không hợp lệ.');
+        }
+        if ($email === '' || mb_strlen($email) > 190 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('Email không hợp lệ.');
+        }
+        if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^\w\s]).{8,}$/u', $password)) {
+            throw new RuntimeException(
+                'Mật khẩu tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và ký hiệu đặc biệt.'
+            );
+        }
+        if ($this->emailExists($email)) {
+            throw new RuntimeException('Email này đã được đăng ký.');
+        }
+
+        $code = $this->nextReaderCode();
+        for ($i = 0; $i < 5; $i++) {
+            $dup = $this->fetchOne(
+                'SELECT id FROM nguoi_dung WHERE ma_doc_gia = ? LIMIT 1',
+                [$code]
+            );
+            if (!$dup) {
+                break;
+            }
+            $code = $this->nextReaderCode();
+        }
+
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $this->execute(
+            "INSERT INTO nguoi_dung
+                (ma_doc_gia, ho_ten, email, mat_khau_bam, vai_tro, so_dien_thoai, bi_khoa)
+             VALUES (?, ?, ?, ?, 'doc_gia', ?, 0)",
+            [$code, $hoTen, $email, $hash, $phone]
+        );
+        return $this->lastInsertId();
+    }
 }

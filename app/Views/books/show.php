@@ -64,11 +64,16 @@ $statusStyle = [
             <div style="white-space:pre-line;line-height:1.7;color:var(--text-muted);">
                 <?= e($book['mo_ta'] ?: 'Chưa có mô tả cho sách này.') ?>
             </div>
-            <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
                 <a href="<?= e(url('books/edit/' . (int) ($book['id'] ?? 0))) ?>" class="btn">Sửa thông tin sách</a>
                 <a href="<?= e(url('copies')) ?>" class="btn btn-outline">Quản lý bản sao</a>
+                <button type="button" id="btn-delete-book" class="btn" style="background:#dc2626;border-color:#dc2626;color:#fff;">Xóa đầu sách</button>
                 <a href="<?= e(url('books')) ?>" class="btn btn-outline">Quay lại</a>
             </div>
+
+            <form id="form-delete-book" method="POST" action="<?= e(url('books/delete/' . (int) ($book['id'] ?? 0))) ?>" style="display:none;">
+                <?= csrf_field() ?>
+            </form>
         </div>
     </div>
 </div>
@@ -147,3 +152,35 @@ $statusStyle = [
         </div>
     <?php endif; ?>
 </div>
+
+<!-- Modal xác nhận xóa đầu sách -->
+<div id="delete-book-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.45); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; max-width:440px; width:90%; padding:1.5rem; box-shadow:0 12px 40px rgba(0,0,0,.2);">
+        <h3 style="margin:0 0 0.5rem; font-size:1.15rem; color:#3d2b1f;">Xóa đầu sách</h3>
+        <p style="margin:0 0 0.75rem; color:#7a6858; line-height:1.55;">
+            Bạn chắc chắn muốn xóa <strong><?= e($book['ten_sach'] ?? '') ?></strong> khỏi danh mục?
+        </p>
+        <p style="margin:0 0 1.25rem; color:#b91c1c; font-size:0.9rem; line-height:1.5;">
+            Chỉ xóa được khi không còn bản sao đang dùng (đang mượn, còn trên kệ hoặc giữ chỗ). Mọi bản sao phải được thanh lý trước.
+        </p>
+        <div style="display:flex; gap:0.6rem; justify-content:flex-end; flex-wrap:wrap;">
+            <button type="button" id="delete-book-no" class="btn btn-outline">Không</button>
+            <button type="button" id="delete-book-yes" class="btn" style="background:#b91c1c; border-color:#b91c1c;">Xóa</button>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('delete-book-modal');
+    var form = document.getElementById('form-delete-book');
+    var btn = document.getElementById('btn-delete-book');
+    if (!modal || !form || !btn) return;
+    function openModal() { modal.style.display = 'flex'; }
+    function closeModal() { modal.style.display = 'none'; }
+    btn.addEventListener('click', openModal);
+    document.getElementById('delete-book-no').addEventListener('click', closeModal);
+    document.getElementById('delete-book-yes').addEventListener('click', function () { form.submit(); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+})();
+</script>
+

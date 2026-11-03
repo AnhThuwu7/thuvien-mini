@@ -8,23 +8,24 @@ class Auth
         'quan_tri' => 'Quản trị viên',
     ];
 
-    // Gọi sau khi đã xác thực mật khẩu thành công
     public static function login(array $user): void
     {
-        session_regenerate_id(true);          // chống session fixation
-        $_SESSION['user'] = [                 // KHÔNG lưu mật khẩu băm
-            'id'      => (int) $user['id'],
-            'ho_ten'  => $user['ho_ten'],
-            'email'   => $user['email'],
-            'vai_tro' => $user['vai_tro'],
+        session_regenerate_id(true);
+        $_SESSION['user'] = [
+            'id'         => (int) $user['id'],
+            'ho_ten'     => $user['ho_ten'],
+            'email'      => $user['email'],
+            'vai_tro'    => $user['vai_tro'],
+            'bi_khoa'    => (int) ($user['bi_khoa'] ?? 0),
+            'ly_do_khoa' => $user['ly_do_khoa'] ?? null,
         ];
-        unset($_SESSION['csrf_token']);       // token mới cho phiên đã đăng nhập
+        unset($_SESSION['csrf_token']);
     }
 
     public static function logout(): void
     {
         $_SESSION = [];
-        session_regenerate_id(true);          // hủy session cũ, giữ 1 session trống để hiện thông báo
+        session_regenerate_id(true);
     }
 
     public static function check(): bool
@@ -32,7 +33,6 @@ class Auth
         return !empty($_SESSION['user']['id']);
     }
 
-    // ['id', 'ho_ten', 'email', 'vai_tro'] hoặc null nếu chưa đăng nhập
     public static function user(): ?array
     {
         return self::check() ? $_SESSION['user'] : null;
@@ -48,14 +48,12 @@ class Auth
         return self::check() ? $_SESSION['user']['vai_tro'] : null;
     }
 
-    // Auth::hasRole('thu_thu', 'quan_tri')
     public static function hasRole(string ...$roles): bool
     {
         $role = self::role();
         return $role !== null && in_array($role, $roles, true);
     }
 
-    // Dùng cho menu: '*' = tất cả mọi người (kể cả khách)
     public static function canSee(array $roles): bool
     {
         return in_array('*', $roles, true) || self::hasRole(...$roles);
@@ -67,7 +65,6 @@ class Auth
         return $role === null ? '' : (self::ROLE_LABELS[$role] ?? '');
     }
 
-    // Ghi nhớ trang đang xem (chỉ GET) để quay lại sau khi đăng nhập
     public static function rememberIntended(): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
@@ -75,7 +72,6 @@ class Auth
         }
     }
 
-    // Lấy URL đã ghi nhớ; chỉ chấp nhận đường dẫn nội bộ (chống open redirect)
     public static function pullIntended(): ?string
     {
         $url = $_SESSION['intended'] ?? null;

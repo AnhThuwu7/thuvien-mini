@@ -1,5 +1,8 @@
-
 <?php
+$keyword = $keyword ?? '';
+$status = $status ?? '';
+$copies = $copies ?? [];
+$pagination = $pagination ?? [];
 $statuses = [
     'con_trong' => 'Còn trống',
     'dang_giu_cho' => 'Đang giữ chỗ',
@@ -199,10 +202,16 @@ $statusColors = [
         </table>
     </div>
 
-    <!-- Tổng số bản sao -->
+    <!-- Tổng số bản sao + phân trang -->
     <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
-        Tổng số bản sao đang hiển thị: <?= count($copies) ?>
+        Tổng số bản sao: <?= (int) ($pagination['total'] ?? count($copies)) ?>
+        (trang <?= (int) ($pagination['page'] ?? 1) ?>/<?= (int) ($pagination['total_pages'] ?? 1) ?>)
     </p>
+    <?php
+    $pagerPath = 'copies';
+    $pagerQuery = ['q' => $keyword ?? '', 'status' => $status ?? ''];
+    require ROOT_PATH . '/app/Views/partials/pager.php';
+    ?>
 
     <div style="margin-top: 1rem;">
         <a href="<?= e(url('books')) ?>" class="btn btn-outline">

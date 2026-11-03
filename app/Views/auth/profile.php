@@ -7,6 +7,17 @@
 <section class="card" style="max-width: 560px; margin: 0 auto;">
     <h1 style="margin-bottom: 1.5rem;">Hồ sơ của tôi</h1>
 
+    <?php if (!empty($me['bi_khoa'])): ?>
+        <div class="alert alert-warning" style="margin-bottom:1.25rem;">
+            <strong>Tài khoản đang bị khóa.</strong>
+            Bạn vẫn đăng nhập được nhưng <strong>không được mượn sách</strong>
+            <?php if (!empty($me['ly_do_khoa'])): ?>
+                — Lý do: <?= e($me['ly_do_khoa']) ?>
+            <?php endif; ?>
+            . Vui lòng liên hệ thủ thư.
+        </div>
+    <?php endif; ?>
+
     <div class="profile-grid">
         <div class="profile-item">
             <span class="profile-label">Họ tên</span>

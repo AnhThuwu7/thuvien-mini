@@ -128,7 +128,20 @@ class LoansController extends Controller
             'selectedStatus' => $status,
         ]);
     }
+    public function show(int $id): void
+    {
+        $this->requireRole('doc_gia');
 
+        $loan = $this->model('Loan')->findLoanForReader($id, (int) Auth::id());
+        if ($loan === null) {
+            $this->abort(404, 'Không tìm thấy phiếu mượn.');
+        }
+
+        $this->view('loans/show', [
+            'title' => 'Chi tiết phiếu mượn',
+            'loan'  => $loan,
+        ]);
+    }
     public function mine(): void
     {
         $this->requireRole('doc_gia');

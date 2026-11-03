@@ -2,11 +2,55 @@
 
 class ApiController extends Controller
 {
+    /**
+     * Endpoint nội bộ: chưa đăng nhập → 401 JSON, sai vai trò → 403 JSON
+     * (không chuyển hướng sang trang HTML như requireRole vì client là Fetch).
+     */
+    private function requireStaffJson(): void
+    {
+        if (!Auth::check()) {
+            $this->jsonError('Chưa đăng nhập.', 401);
+        }
+        if (!Auth::hasRole('thu_thu', 'quan_tri')) {
+            $this->jsonError('Bạn không có quyền truy cập.', 403);
+        }
+    }
+
+    /**
+     * GET /api/books?q=keyword  — gợi ý tên sách (autocomplete, Fetch API)
+     * Công khai như trang tra cứu. Trả về JSON: {ok:true, data:[{id, ten_sach, tac_gia, con_lai}]}
+     * q rỗng hoặc quá ngắn → danh sách rỗng (vẫn là JSON hợp lệ, status 200).
+     */
+    public function books(): void
+    {
+        $q = trim(input('q'));
+
+        if (mb_strlen($q) > 100) {
+            $this->jsonError('Từ khóa quá dài (tối đa 100 ký tự).', 422);
+        }
+        if (mb_strlen($q) < 2) {
+            $this->jsonSuccess([]);
+        }
+
+        $rows = $this->model('Book')->suggest($q, 8);
+
+        $data = array_map(static function (array $r): array {
+            return [
+                'id'       => (int) $r['id'],
+                'ten_sach' => (string) $r['ten_sach'],
+                'tac_gia'  => (string) ($r['tac_gia'] ?? ''),
+                'con_lai'  => (int) $r['con_lai'],
+            ];
+        }, $rows);
+
+        $this->jsonSuccess($data);
+    }
+
     // GET /api/users?q=keyword
     public function users(): void
     {
         // Cho phép Thủ thư và Quản trị truy cập API
-        $this->requireRole('thu_thu', 'quan_tri');
+        $this->requireStaffJson();
 
         $keyword = input('q');
         $userModel = $this->model('User');
@@ -23,7 +67,7 @@ class ApiController extends Controller
      */
     public function stats(): void
     {
-        $this->requireRole('thu_thu', 'quan_tri');
+        $this->requireStaffJson();
 
         $db = Database::getInstance()->getConnection();
 
