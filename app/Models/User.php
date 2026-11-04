@@ -170,4 +170,50 @@ class User extends Model
         );
         return $this->lastInsertId();
     }
+
+    /**
+     * Quên mật khẩu (đồ án): xác thực họ tên + SĐT (đúng 10 số).
+     * Chỉ áp dụng tài khoản độc giả chưa xóa mềm.
+     */
+    public function findByHoTenAndPhone(string $hoTen, string $phone): ?array
+    {
+        $hoTen = trim($hoTen);
+        $phone = preg_replace('/\D+/', '', $phone);
+
+        if ($hoTen === '' || strlen($phone) !== 10) {
+            return null;
+        }
+
+        return $this->fetchOne(
+            "SELECT id, ma_doc_gia, ho_ten, email, vai_tro, so_dien_thoai, bi_khoa
+               FROM nguoi_dung
+              WHERE vai_tro = 'doc_gia'
+                AND xoa_luc IS NULL
+                AND so_dien_thoai = ?
+                AND ho_ten = ?
+              LIMIT 1",
+            [$phone, $hoTen]
+        );
+    }
+
+    public function updatePassword(int $userId, string $plainPassword): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+        if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^\w\s]).{8,}$/u', $plainPassword)) {
+            throw new RuntimeException(
+                'Mật khẩu tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và ký hiệu đặc biệt.'
+            );
+        }
+        $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
+        return $this->execute(
+            "UPDATE nguoi_dung
+                SET mat_khau_bam = ?
+              WHERE id = ?
+                AND xoa_luc IS NULL",
+            [$hash, $userId]
+        ) > 0;
+    }
+
 }

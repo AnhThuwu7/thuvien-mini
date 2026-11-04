@@ -204,4 +204,90 @@ class AuthController extends Controller
             'me'    => $me,
         ]);
     }
+
+    // GET/POST auth/forgot — quên mật khẩu (xác thực họ tên + SĐT, không gửi email)
+    public function forgot()
+    {
+        if (Auth::check()) {
+            $this->redirect($this->homeForRole(Auth::user()['vai_tro'] ?? ''));
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->handleForgot();
+            return;
+        }
+
+        $this->view('auth/forgot', [
+            'title'  => 'Quên mật khẩu',
+            'errors' => [],
+            'old'    => ['ho_ten' => '', 'so_dien_thoai' => ''],
+        ]);
+    }
+
+    private function handleForgot(): void
+    {
+        $hoTen = trim((string) ($_POST['ho_ten'] ?? ''));
+        $phone = trim((string) ($_POST['so_dien_thoai'] ?? ''));
+        $pass  = (string) ($_POST['password'] ?? '');
+        $pass2 = (string) ($_POST['password_confirmation'] ?? '');
+        $errors = [];
+        $old = ['ho_ten' => $hoTen, 'so_dien_thoai' => $phone];
+
+        if ($hoTen === '') {
+            $errors['ho_ten'] = 'Vui lòng nhập họ tên đầy đủ đã đăng ký.';
+        } elseif (mb_strlen($hoTen) > 100) {
+            $errors['ho_ten'] = 'Họ tên tối đa 100 ký tự.';
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($phone === '') {
+            $errors['so_dien_thoai'] = 'Vui lòng nhập số điện thoại đã đăng ký.';
+        } elseif ($digits !== $phone || strlen($digits) !== 10) {
+            $errors['so_dien_thoai'] = 'Số điện thoại phải gồm đúng 10 chữ số.';
+        } else {
+            $phone = $digits;
+            $old['so_dien_thoai'] = $phone;
+        }
+
+        if ($pass === '') {
+            $errors['password'] = 'Vui lòng nhập mật khẩu mới.';
+        } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^\w\s]).{8,}$/u', $pass)) {
+            $errors['password'] = 'Mật khẩu tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và ký hiệu đặc biệt.';
+        }
+
+        if ($pass2 === '') {
+            $errors['password_confirmation'] = 'Vui lòng nhập lại mật khẩu mới.';
+        } elseif ($pass !== $pass2) {
+            $errors['password_confirmation'] = 'Mật khẩu nhập lại không khớp.';
+        }
+
+        if (!$errors) {
+            $user = $this->model('User')->findByHoTenAndPhone($hoTen, $phone);
+            if ($user === null) {
+                // Không tiết lộ field nào sai
+                $errors['form'] = 'Không tìm thấy tài khoản độc giả khớp họ tên và số điện thoại.';
+            } elseif (!empty($user['bi_khoa'])) {
+                $errors['form'] = 'Tài khoản đang bị khóa. Liên hệ thủ thư để được hỗ trợ.';
+            } else {
+                try {
+                    $this->model('User')->updatePassword((int) $user['id'], $pass);
+                    flash('success', 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.');
+                    $this->redirect(url('auth/login'));
+                    return;
+                } catch (RuntimeException $e) {
+                    $errors['password'] = $e->getMessage();
+                } catch (Throwable $e) {
+                    error_log('[forgot] ' . $e->getMessage());
+                    $errors['form'] = 'Không đặt lại được mật khẩu. Thử lại sau.';
+                }
+            }
+        }
+
+        $this->view('auth/forgot', [
+            'title'  => 'Quên mật khẩu',
+            'errors' => $errors,
+            'old'    => $old,
+        ]);
+    }
+
 }

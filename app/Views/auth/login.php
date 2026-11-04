@@ -46,6 +46,10 @@
             <?php endif; ?>
         </div>
 
+        <p style="margin:0.35rem 0 0.75rem;text-align:right;font-size:0.9rem;">
+            <a href="<?= e(url('auth/forgot')) ?>">Quên mật khẩu?</a>
+        </p>
+
         <button type="submit" class="btn btn-block mt-2">Đăng nhập</button>
     </form>
 
