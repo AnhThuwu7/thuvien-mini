@@ -1,0 +1,10 @@
+UPDATE sach SET anh_bia = 'uploads/books/6601662402256176c816dbbe737ebfd2.jpg' WHERE id = 19;
+UPDATE sach SET anh_bia = 'uploads/books/bc5aa9aad29d617cc25b2b7b5876725a.jpg' WHERE id = 20;
+UPDATE sach SET anh_bia = 'uploads/books/f3d0059487604142e76ab387f684724f.jpg' WHERE id = 21;
+UPDATE sach SET anh_bia = 'uploads/books/ddf8c41cd4528930bc065828fdae4677.jpg' WHERE id = 22;
+UPDATE sach SET anh_bia = 'uploads/books/b5c9571be2c2e45685a70bdfed31a08c.jpg' WHERE id = 23;
+UPDATE sach SET anh_bia = 'uploads/books/62d5ba750b1c8eb3113548afb99c4100.jpg' WHERE id = 24;
+UPDATE sach SET anh_bia = 'uploads/books/8b8e52500083b7785e709942a286e19e.jpg' WHERE id = 25;
+UPDATE sach SET anh_bia = 'uploads/books/64f7a2edffe598ff4b2c60f535d51489.jpg' WHERE id = 26;
+UPDATE sach SET anh_bia = 'uploads/books/efe14e611d1192ad8030fa5ef088c127.jpg' WHERE id = 27;
+UPDATE sach SET anh_bia = 'uploads/books/ee8fddfeacf81139181f67726508e733.jpg' WHERE id = 28;
