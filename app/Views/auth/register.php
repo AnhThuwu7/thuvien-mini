@@ -4,10 +4,7 @@ $old = $old ?? ['ho_ten' => '', 'email' => '', 'so_dien_thoai' => ''];
 ?>
 <section class="card narrow" style="max-width:420px;margin:1.5rem auto;">
     <h1 style="margin-top:0;">Đăng ký độc giả</h1>
-    <p style="color:var(--text-muted);font-size:0.95rem;">
-        Chỉ đăng ký tài khoản <strong>độc giả</strong>. Tài khoản thủ thư / quản trị do admin cấp.
-    </p>
-
+    
     <?php if (!empty($errors['register'])): ?>
         <div class="alert alert-danger"><?= e($errors['register']) ?></div>
     <?php endif; ?>
