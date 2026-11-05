@@ -30,7 +30,7 @@ $canRequest = $so_con_trong > 0 && !$isStaff;
 
 <section style="max-width:960px;margin:0 auto;padding:1.5rem 0;">
     <div style="margin-bottom:1rem;">
-        <a href="<?= e(url($isGuest ? '' : 'catalog')) ?>" class="btn btn-outline">← Quay lại tra cứu</a>
+        <a href="<?= e(url($isGuest ? '' : 'catalog')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url($isGuest ? '' : 'catalog')) ?>">← Quay lại tra cứu</a>
     </div>
 
     <div class="card" style="padding:1.5rem;background:#fff;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.25rem;">

@@ -231,7 +231,7 @@ document.getElementById('anh_bia').addEventListener('change', function () {
                 Lưu sách
             </button>
 
-            <a href="<?= e(url('books')) ?>" class="btn btn-outline">
+            <a href="<?= e(url('books')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('books')) ?>">
                 Quay lại danh sách
             </a>
         </div>

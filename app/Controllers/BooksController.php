@@ -386,7 +386,8 @@ public function update(int $id): void
         $bookModel->syncAuthors($id, $form['tac_gia'] ?? '');
 
         flash('success', 'Cập nhật thông tin sách thành công.');
-        $this->redirect(url('books'));
+        // Ở lại trang sửa để không bị đẩy về danh sách (trải nghiệm liền mạch hơn)
+        $this->redirect(url('books/edit/' . $id));
     } catch (RuntimeException $e) {
         $this->view('books/edit', [
             'title' => 'Sửa thông tin sách',

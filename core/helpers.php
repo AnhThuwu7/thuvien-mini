@@ -134,6 +134,13 @@ function flash_all(): array
     return $result;
 }
 
+/** Alias: layout cũ gọi flash_pull() */
+function flash_pull(): array
+{
+    return flash_all();
+}
+
+
 /** Lưu dữ liệu form vừa nhập để điền lại khi báo lỗi (không lưu mật khẩu, CSRF). Dùng trước khi redirect. */
 function set_old(array $input): void
 {

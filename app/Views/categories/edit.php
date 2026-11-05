@@ -1,4 +1,3 @@
-
 <?php
 $category = $category ?? [];
 $errors = $errors ?? [];
@@ -66,7 +65,7 @@ $errors = $errors ?? [];
                 Lưu thay đổi
             </button>
 
-            <a href="<?= e(url('categories')) ?>" class="btn btn-outline">
+            <a href="<?= e(url('categories')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('categories')) ?>">
                 Quay lại
             </a>
         </div>

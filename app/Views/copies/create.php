@@ -174,7 +174,7 @@ $statusLabels = [
                     Lưu bản sao
                 </button>
 
-                <a href="<?= e(url('copies')) ?>" class="btn btn-outline">
+                <a href="<?= e(url('copies')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('copies')) ?>">
                     Quay lại
                 </a>
             </div>

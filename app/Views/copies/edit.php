@@ -1,5 +1,9 @@
-
 <?php
+$copy = $copy ?? [];
+$books = $books ?? [];
+$form = $form ?? [];
+$errors = $errors ?? [];
+$statuses = $statuses ?? ['con_trong', 'dang_giu_cho', 'dang_muon', 'hong', 'mat', 'thanh_ly'];
 $statusLabels = [
     'con_trong' => 'Còn trống',
     'dang_giu_cho' => 'Đang giữ chỗ',
@@ -159,7 +163,7 @@ $statusLabels = [
                     Cập nhật bản sao
                 </button>
 
-                <a href="<?= e(url('copies')) ?>" class="btn btn-outline">
+                <a href="<?= e(url('copies')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('copies')) ?>">
                     Quay lại
                 </a>
             </div>

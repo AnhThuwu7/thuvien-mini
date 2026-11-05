@@ -256,7 +256,7 @@
 
 <main class="container page-content">
 <?php
-$flashes = function_exists('flash_pull') ? flash_pull() : [];
+$flashes = function_exists('flash_all') ? flash_all() : [];
 if ($flashes):
 ?>
 <div class="flash-wrap">

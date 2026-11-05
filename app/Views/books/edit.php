@@ -168,7 +168,7 @@ document.getElementById('anh_bia').addEventListener('change', function () {
 
         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
             <button type="submit" class="btn">Lưu thay đổi</button>
-            <a href="<?= e(url('books')) ?>" class="btn btn-outline">Quay lại danh sách</a>
+            <a href="<?= e(url('books')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('books')) ?>">Quay lại danh sách</a>
         </div>
     </form>
 </section>

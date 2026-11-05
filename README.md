@@ -148,7 +148,7 @@ Chi tiết validation: [docs/validation-rules.md](docs/validation-rules.md).
 
 ---
 
-## 8. Checklist nộp cô (Bài 7)
+## 8. Yêu cầu phân quyền/đăng nhập
 
 | Nộp | Nội dung |
 |-----|----------|

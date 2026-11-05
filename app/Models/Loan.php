@@ -97,7 +97,7 @@ class Loan extends Model
             }
 
             $copy = $this->fetchOne(
-                "SELECT bs.id, bs.trang_thai
+                "SELECT bs.id, bs.trang_thai, bs.sach_id
                  FROM ban_sao AS bs
                  INNER JOIN sach AS s ON s.id = bs.sach_id
                  WHERE bs.id = ?
@@ -116,6 +116,23 @@ class Loan extends Model
             if ($copy['trang_thai'] !== 'con_trong') {
                 throw new RuntimeException(
                     'Bản sao sách hiện không có sẵn.'
+                );
+            }
+
+            // Độc giả đã đang mượn cùng đầu sách (chưa trả)
+            $sameTitle = $this->fetchOne(
+                "SELECT pm.id
+                   FROM phieu_muon pm
+                   INNER JOIN ban_sao bs ON bs.id = pm.ban_sao_id
+                  WHERE pm.nguoi_dung_id = ?
+                    AND pm.tra_luc IS NULL
+                    AND bs.sach_id = ?
+                  LIMIT 1",
+                [$userId, (int) $copy['sach_id']]
+            );
+            if ($sameTitle) {
+                throw new RuntimeException(
+                    'Độc giả đang mượn cuốn sách này rồi. Hãy trả sách trước khi mượn thêm bản khác của cùng đầu sách.'
                 );
             }
 

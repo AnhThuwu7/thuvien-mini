@@ -30,7 +30,7 @@ $statusStyle = [
         <h1 style="margin:0 0 0.35rem;">Chi tiết sách</h1>
         <p style="margin:0;color:var(--text-muted);">Thông tin đầu sách và tình trạng từng bản sao (kèm người đang mượn).</p>
     </div>
-    <a href="<?= e(url('books')) ?>" class="btn btn-outline">Quay lại danh sách</a>
+    <a href="<?= e(url('books')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('books')) ?>">Quay lại danh sách</a>
 </div>
 
 <div class="card" style="padding:1.5rem;background:#fff;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.25rem;">
@@ -68,7 +68,7 @@ $statusStyle = [
                 <a href="<?= e(url('books/edit/' . (int) ($book['id'] ?? 0))) ?>" class="btn">Sửa thông tin sách</a>
                 <a href="<?= e(url('copies')) ?>" class="btn btn-outline">Quản lý bản sao</a>
                 <button type="button" id="btn-delete-book" class="btn" style="background:#dc2626;border-color:#dc2626;color:#fff;">Xóa đầu sách</button>
-                <a href="<?= e(url('books')) ?>" class="btn btn-outline">Quay lại</a>
+                <a href="<?= e(url('books')) ?>" class="btn btn-outline js-back" data-fallback="<?= e(url('books')) ?>">Quay lại</a>
             </div>
 
             <form id="form-delete-book" method="POST" action="<?= e(url('books/delete/' . (int) ($book['id'] ?? 0))) ?>" style="display:none;">
@@ -183,4 +183,3 @@ $statusStyle = [
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
 })();
 </script>
-

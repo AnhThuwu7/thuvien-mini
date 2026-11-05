@@ -447,6 +447,21 @@ class LoanRequest extends Model
             throw new RuntimeException('Không tìm thấy đầu sách.');
         }
 
+        // Đang mượn đúng đầu sách này (chưa trả) → không cho gửi yêu cầu nữa
+        $holding = $this->fetchOne(
+            "SELECT pm.id
+               FROM phieu_muon pm
+               INNER JOIN ban_sao bs ON bs.id = pm.ban_sao_id
+              WHERE pm.nguoi_dung_id = ?
+                AND pm.tra_luc IS NULL
+                AND bs.sach_id = ?
+              LIMIT 1",
+            [$userId, $bookId]
+        );
+        if ($holding) {
+            throw new RuntimeException('Bạn đang mượn cuốn sách này rồi. Hãy trả sách trước khi mượn thêm bản khác của cùng đầu sách.');
+        }
+
         $existing = $this->fetchOne(
             "SELECT id FROM yeu_cau_muon
              WHERE nguoi_dung_id = ?
